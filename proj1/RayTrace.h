@@ -71,6 +71,7 @@ struct Fill {
 class Tracer {
 public:
     Tracer(const string &fname);
+    ~Tracer();
     Eigen::Vector3d castRay(const Ray &r, double t0, double t1) const;
     void createImage(const string &fname);
     void details();

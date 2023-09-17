@@ -2,12 +2,15 @@
 #include <sstream>
 #include <fstream>
 
+
+// Returns the determinant of the 3x3 matrix
 double det(const Eigen::Vector3d &a, const Eigen::Vector3d &b, const Eigen::Vector3d &c) {
     return  a[0] * (b[1] * c[2] - c[1] * b[2]) +
             b[0] * (c[1] * a[2] - a[1] * c[2]) +
             c[0] * (a[1] * b[2] - b[1] * a[2]);
 }
 
+// Reads all of the data from the nff file
 Tracer::Tracer(const string &fname) {
     ifstream istream(fname.c_str() ,ios_base::in);
     string line;
@@ -86,6 +89,15 @@ Tracer::Tracer(const string &fname) {
     istream.close();
 }
 
+// Deletes all of the surface objects
+Tracer::~Tracer(){
+    for (int i = 0; i<surfaces.size(); i++) {
+        delete surfaces[i];
+    }
+}
+
+// Casts a Ray, and checks every object to see if it exists within its path
+// Currently, the only objects that exists are triangles, but this code is set up to expand to other surfaces
 Eigen::Vector3d Tracer::castRay(const Ray &r, double t0, double t1) const {
     HitRecord hr;
     Eigen::Vector3d color(bcolor);
@@ -101,6 +113,11 @@ Eigen::Vector3d Tracer::castRay(const Ray &r, double t0, double t1) const {
     return color;
 }
 
+// Sets up the camera and casts a ray for every pixel of the image
+// It then adds the pixel to the image, which it exports at the end
+// Currently, this is only set up to change the color if the ray had an intersection
+// It doesn't really care if there is more than one intersection, since all surfaces are of the same type and color
+// This will have to be rectified in the future 
 void Tracer::createImage(const string &fname) {
     Eigen::Vector3d w = eye - at;
     w /= w.norm();
@@ -149,7 +166,8 @@ void Tracer::createImage(const string &fname) {
 }
 
 
-
+// A class that prints all of the details read from the nff file
+// Isn't utilized in the current code, was just to check if the file was being read properly
 void Tracer::details(){
     cout << "Background Color:" << endl;
     cout << "R: " <<bcolor[0] << "\tB: " << bcolor[1] << "\tG: " << bcolor[2] << endl << endl;
@@ -173,7 +191,7 @@ void Tracer::details(){
 
 
 
-
+// Shows the details of the triangle object
 void Triangle::details() {
     cout << "Type: Triangle" << endl;
     cout << a[0] << "\t" << a[1] << "\t" << a[2] << endl;
@@ -181,6 +199,7 @@ void Triangle::details() {
     cout << c[0] << "\t" << c[1] << "\t" << c[2] << endl;
 }
 
+// Simple constructor for the Triangle class. probably could be done better
 Triangle::Triangle(Eigen::Vector3d& A, Eigen::Vector3d& B, Eigen::Vector3d& C) {
     a = A;
     b = B;
@@ -189,6 +208,8 @@ Triangle::Triangle(Eigen::Vector3d& A, Eigen::Vector3d& B, Eigen::Vector3d& C) {
 
 }
 
+// Checks to see if the Ray hits this Triangle
+// If it was hit, it records the details in the HitRecord
 bool Triangle::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     Eigen::Vector3d ba = a-b;
     Eigen::Vector3d ca = a-c;
