@@ -8,7 +8,20 @@
 using namespace std;
 
 
+struct Ray {
+    Eigen::Vector3d e;
+    Eigen::Vector3d d;
+};
 
+struct HitRecord {
+    Eigen::Vector3d p;
+    Eigen::Vector3d n;
+    Eigen::Vector3d v;
+    double t;
+    double alpha;
+    double beta;
+    double gamma;
+};
 
 class Surface {
 public:
@@ -16,7 +29,7 @@ public:
         type = "null";
     }
     virtual void details() = 0;
-    //HitRecord hit(const Ray &r, double t0, double t1) const;
+    virtual bool hit(const Ray &r, double t0, double t1, HitRecord &hr) const = 0;
 protected:
     string type;
 
@@ -27,6 +40,7 @@ public:
     Triangle();
     Triangle(Eigen::Vector3d& A, Eigen::Vector3d& B, Eigen::Vector3d& C);
     void details();
+    bool hit(const Ray &r, double t0, double t1, HitRecord &hr) const;
 private:
     Eigen::Vector3d a;
     Eigen::Vector3d b;
@@ -53,13 +67,12 @@ struct Fill {
     double ior;
 };
 
+
 class Tracer {
 public:
     Tracer(const string &fname);
-    //Eigen::Vector3d shade(const HitRecord &hr) const;
-    //Eigen::Vector3d castRay(const Ray &r, double t0, double t1) const;
-    //void createImage();
-    void writeImage(const string &fname);
+    Eigen::Vector3d castRay(const Ray &r, double t0, double t1) const;
+    void createImage(const string &fname);
     void details();
 
 private:
