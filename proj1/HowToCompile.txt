@@ -1,0 +1,1 @@
+g++ -I C:\Users\zacha\Documents\eigen-3.4.0\ RayTrace.cpp -o RayTrace
