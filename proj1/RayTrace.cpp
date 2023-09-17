@@ -109,3 +109,9 @@ Triangle::details() {
     cout << b[0] << "\t" << b[1] << "\t" << b[2] << endl;
     cout << c[0] << "\t" << c[1] << "\t" << c[2] << endl;
 }
+
+int main(int argc, const char * argv[]) {
+    Tracer tracer(argv[optind++]);
+    tracer.details();
+    return 0;
+}
