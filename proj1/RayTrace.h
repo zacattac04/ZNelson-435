@@ -59,7 +59,7 @@ public:
     //Eigen::Vector3d shade(const HitRecord &hr) const;
     //Eigen::Vector3d castRay(const Ray &r, double t0, double t1) const;
     //void createImage();
-    //void writeImage(const string &fname);
+    void writeImage(const string &fname);
     void details();
 
 private:

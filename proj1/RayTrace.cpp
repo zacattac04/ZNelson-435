@@ -121,9 +121,27 @@ Triangle::Triangle(Eigen::Vector3d& A, Eigen::Vector3d& B, Eigen::Vector3d& C) {
     type = "Triangle";
 
 }
+
+void Tracer::writeImage(const string &fname) {
+    int height = (int) res[1];
+    int width = (int) res[0];
+    unsigned char pixels[height][width][3];
+    for (int i = 0; i < height; i++){
+        for (int j = 0; j < width; j++) {
+            for (int k = 0; k < 3; k++) {
+                pixels[i][j][k] = bcolor[k] * 255;
+            }
+        }
+    }
+    FILE *f = fopen("hide.ppm","wb");
+    fprintf(f, "P6\n%d %d\n%d\n", width, height, 255);
+    fwrite(pixels, 1, height*width*3, f);
+    fclose(f);
+}
 int main(int argc, const char * argv[]) {
     Tracer tracer(argv[1]);
     cout << "printing details:" << endl;
     tracer.details();
+    tracer.writeImage(argv[2]);
     return 0;
 }
