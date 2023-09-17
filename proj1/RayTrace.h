@@ -47,17 +47,6 @@ private:
     Eigen::Vector3d c;
 };
 
-/*
-class HitRecord {
-public:
-    HitRecord();
-private:
-    Surface s;
-    double t;
-    Eigen::Vector3d n;
-
-};
-*/
 struct Fill {
     Eigen::Vector3d color;
     double kd;

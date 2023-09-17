@@ -11,6 +11,7 @@ double det(const Eigen::Vector3d &a, const Eigen::Vector3d &b, const Eigen::Vect
 }
 
 // Reads all of the data from the nff file
+// except for the 'l' line. Not quite sure what that's for...
 Tracer::Tracer(const string &fname) {
     ifstream istream(fname.c_str() ,ios_base::in);
     string line;
