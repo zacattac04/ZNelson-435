@@ -107,11 +107,11 @@ void Tracer::createImage(const string &fname) {
     Eigen::Vector3d u = up.cross(w);
     u.normalize();
     Eigen::Vector3d v = w.cross(u);
-
+    //cout << "w: \n" << w << " u: \n" << u << "v: \n" << v << endl;
     double d = (eye - at).norm();
     double h = tan((M_PI/180.0) * (angle/2.0)) * d;
     double increment = (2*h) / res[0];
-    double l = -h + 0.5+increment;
+    double l = -h + 0.5*increment;
     double t = h*(((double)res[1])/res[0]) - 0.5*increment;
     int height = (int) res[1];
     int width = (int) res[0];
