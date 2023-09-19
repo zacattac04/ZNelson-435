@@ -77,8 +77,22 @@ Tracer::Tracer(const string &fname) {
                     stringstream css(line);
                     Eigen::Vector3d C;
                     css>>C[0]>>C[1]>>C[2];
-                    //Triangle* triangle = new Triangle(A, B, C);
-                    surfaces.push_back(new Triangle(A, B, C));
+                    Triangle triangle = new Triangle(A, B, C);
+                    triangle.setFill(fill);
+                    //surfaces.push_back(new Triangle(A, B, C));
+                    surfaces.push_back(triangle);
+                } else if (numCoords > 3) {
+                    vector<Eigen::Vector3d> verts;
+                    for (int i = 0; i < numCoords; i++) {
+                        getLine(istream, line);
+                        stringstream ss(line);
+                        Eigen::Vector3d v;
+                        ss>>v[1]>>v[2]>>v[3];
+                    }
+                    Poly poly = new Poly(verts);
+                    poly.setFill(fill);
+                    surfaces.push_back(poly);
+
                 }
                 break;
             }
@@ -242,6 +256,7 @@ bool Triangle::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     return true;
 
 }
+
 
 int main(int argc, const char * argv[]) {
     if (argv[1] == nullptr) {

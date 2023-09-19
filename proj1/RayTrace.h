@@ -30,8 +30,11 @@ public:
     }
     virtual void details() = 0;
     virtual bool hit(const Ray &r, double t0, double t1, HitRecord &hr) const = 0;
+    void setFill(Fill f) {fill = f;}
+    Fill getFill() {return fill;}
 protected:
     string type;
+    Fill fill;
 
 };
 
@@ -46,6 +49,13 @@ private:
     Eigen::Vector3d b;
     Eigen::Vector3d c;
 };
+
+class Poly: public Surface{
+    Poly(vector<Eigen::Vector3d> vertices){ verts = vertices;}
+    Eigen::Vector3d getVertex(int i) {return verts[i]}
+private:
+    vector<Eigen::Vector3d> verts;
+}
 
 struct Fill {
     Eigen::Vector3d color;
