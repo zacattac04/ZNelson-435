@@ -77,20 +77,22 @@ Tracer::Tracer(const string &fname) {
                     stringstream css(line);
                     Eigen::Vector3d C;
                     css>>C[0]>>C[1]>>C[2];
-                    Triangle triangle = new Triangle(A, B, C);
-                    triangle.setFill(fill);
+                    Triangle* triangle = new Triangle(A, B, C);
+                    triangle->setFill(fill);
                     //surfaces.push_back(new Triangle(A, B, C));
                     surfaces.push_back(triangle);
                 } else if (numCoords > 3) {
                     vector<Eigen::Vector3d> verts;
                     for (int i = 0; i < numCoords; i++) {
-                        getLine(istream, line);
+                        //cout << "reading vertex" << (i+1) << endl;
+                        getline(istream, line);
                         stringstream ss(line);
                         Eigen::Vector3d v;
-                        ss>>v[1]>>v[2]>>v[3];
+                        ss>>v[0]>>v[1]>>v[2];
+                        verts.push_back(v);
                     }
-                    Poly poly = new Poly(verts);
-                    poly.setFill(fill);
+                    Poly* poly = new Poly(verts);
+                    poly->setFill(fill);
                     surfaces.push_back(poly);
 
                 }
@@ -215,9 +217,11 @@ void Tracer::details(){
 // Shows the details of the triangle object
 void Triangle::details() {
     cout << "Type: Triangle" << endl;
-    cout << a[0] << "\t" << a[1] << "\t" << a[2] << endl;
-    cout << b[0] << "\t" << b[1] << "\t" << b[2] << endl;
-    cout << c[0] << "\t" << c[1] << "\t" << c[2] << endl;
+    cout << "Color: " << endl;
+    cout << "R: " << fill.color[0] << "\tB: " << fill.color[1] << "\tG: " << fill.color[2] << endl << endl;
+    //cout << a[0] << "\t" << a[1] << "\t" << a[2] << endl;
+    //cout << b[0] << "\t" << b[1] << "\t" << b[2] << endl;
+    //cout << c[0] << "\t" << c[1] << "\t" << c[2] << endl;
 }
 
 // Simple constructor for the Triangle class. probably could be done better
@@ -257,14 +261,24 @@ bool Triangle::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
 
 }
 
+void Poly::details(){
+    cout << "Type: Polygon with " << verts.size() << " vertices" << endl;
+    cout << "Color: " << endl;
+    cout << "R: " << fill.color[0] << "\tB: " << fill.color[1] << "\tG: " << fill.color[2] << endl << endl;
+
+}
+
+// WIP
+bool Poly::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
+    return false;
+}
 
 int main(int argc, const char * argv[]) {
     if (argv[1] == nullptr) {
         throw runtime_error("No input file given");
     }
     Tracer tracer(argv[1]);
-    //tracer.details();
-    //cout << "Drawing image:" << endl;
-    tracer.createImage(argv[2]);
+    tracer.details();
+    //tracer.createImage(argv[2]);
     return 0;
 }

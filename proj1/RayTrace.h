@@ -8,6 +8,15 @@
 using namespace std;
 
 
+struct Fill {
+    Eigen::Vector3d color;
+    double kd;
+    double ks;
+    double shine;
+    double t;
+    double ior;
+};
+
 struct Ray {
     Eigen::Vector3d e;
     Eigen::Vector3d d;
@@ -51,20 +60,15 @@ private:
 };
 
 class Poly: public Surface{
+public:
     Poly(vector<Eigen::Vector3d> vertices){ verts = vertices;}
-    Eigen::Vector3d getVertex(int i) {return verts[i]}
+    Eigen::Vector3d getVertex(int i) {return verts[i];}
+    void details();
+    bool hit(const Ray &r, double t0, double t1, HitRecord &hr) const;
 private:
     vector<Eigen::Vector3d> verts;
-}
-
-struct Fill {
-    Eigen::Vector3d color;
-    double kd;
-    double ks;
-    double shine;
-    double t;
-    double ior;
 };
+
 
 
 class Tracer {
