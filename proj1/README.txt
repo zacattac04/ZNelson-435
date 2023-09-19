@@ -2,6 +2,12 @@ Zachary Nelson
 Project 1
 CMSC 435
 
+****************************************************************************
+NOTE
+
+This is me attempting to do the extra credit. The working copy is in the main branch.
+****************************************************************************
+
 This program will read the information from an NFF file, and use ray tracing to create a PPM file.
 It is only set up to trace triangles, and does not care which is closer.
 It is also not set up to differentiate colors between surfaces.
