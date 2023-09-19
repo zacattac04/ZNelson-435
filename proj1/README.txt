@@ -14,3 +14,4 @@ This was primarily from official documentation, as well as looking over my past 
 HOW TO RUN:
 ./RayTrace "inputFile.nff" "Outputfile.ppm"
 If an output file is not given, it will default to "hide.ppm"
+If an input file is not given it will throw a runtime error
