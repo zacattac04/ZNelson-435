@@ -116,7 +116,7 @@ Eigen::Vector3d Tracer::castRay(const Ray &r, double t0, double t1) const {
 
 // Sets up the camera and casts a ray for every pixel of the image
 // It then adds the pixel to the image, which it exports at the end
-// Currently, this is only set up to change the color if the ray had an intersection
+// Currently, this is only set up to change the color to a default fill if the ray had an intersection
 // It doesn't really care if there is more than one intersection, since all surfaces are of the same type and color
 // This will have to be rectified in the future 
 void Tracer::createImage(const char * &fname) {

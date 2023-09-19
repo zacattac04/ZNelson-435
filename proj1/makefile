@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -I C:\Users\zacha\Documents\eigen-3.4.0
+CXXFLAGS = -I/usr/include/eigen3/
 
 RayTrace:
 	$(CXX) $(CXXFLAGS) RayTrace.cpp -o RayTrace
