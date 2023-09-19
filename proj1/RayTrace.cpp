@@ -244,6 +244,9 @@ bool Triangle::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
 }
 
 int main(int argc, const char * argv[]) {
+    if (argv[1] == nullptr) {
+        throw runtime_error("No input file given");
+    }
     Tracer tracer(argv[1]);
     //tracer.details();
     //cout << "Drawing image:" << endl;
