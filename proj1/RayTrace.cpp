@@ -119,7 +119,7 @@ Eigen::Vector3d Tracer::castRay(const Ray &r, double t0, double t1) const {
 // Currently, this is only set up to change the color if the ray had an intersection
 // It doesn't really care if there is more than one intersection, since all surfaces are of the same type and color
 // This will have to be rectified in the future 
-void Tracer::createImage(const string &fname) {
+void Tracer::createImage(const char * &fname) {
     Eigen::Vector3d w = eye - at;
     w /= w.norm();
     Eigen::Vector3d u = up.cross(w);
@@ -159,7 +159,13 @@ void Tracer::createImage(const string &fname) {
         }
     }
     cout << endl << "done!" << endl;
-    FILE *f = fopen("hide.ppm","wb");
+    if (fname == nullptr) {
+        cout << "Output file not given. Writing to \"hide.ppm\"" << endl;
+        fname = "hide.ppm";
+    } else {
+        cout << "Writing to " << fname << endl;
+    }
+    FILE *f = fopen(fname,"wb");
     fprintf(f, "P6\n%d %d\n%d\n", width, height, 255);
     fwrite(pixels, 1, height*width*3, f);
     fclose(f);

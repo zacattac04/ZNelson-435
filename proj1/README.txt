@@ -10,3 +10,7 @@ However, I have hopefully created it in such a way that it will not be difficult
 I did not use any resources outside of the instructor and textbook when it came to ray tracing. 
 However, it has been over a year since I have done any serious project in C++, so I needed to use resources as a refresher.
 This was primarily from official documentation, as well as looking over my past projects.
+
+HOW TO RUN:
+./RayTrace "inputFile.nff" "Outputfile.ppm"
+If an output file is not given, it will default to "hide.ppm"
