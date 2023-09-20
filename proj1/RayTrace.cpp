@@ -98,6 +98,15 @@ Tracer::Tracer(const string &fname) {
                 }
                 break;
             }
+            case 's': {
+                stringstream ss(line);
+                Eigen::Vector3d c;
+                double r;
+                ss>>ch>>c[0]>>c[1]>>c[2]>>r;
+                Sphere* sphere = new Sphere(c, r);
+                sphere->setFill(fill);
+                surfaces.push_back(sphere);
+            }
             default: {
                 break;
             }
@@ -118,15 +127,17 @@ Tracer::~Tracer(){
 Eigen::Vector3d Tracer::castRay(const Ray &r, double t0, double t1) const {
     HitRecord hr;
     Eigen::Vector3d color(bcolor);
-
+    double closest = t1;
     bool hit = false;
     for (int i = 0; i<surfaces.size(); i++) {
         if  (surfaces[i]->hit(r, t0, t1, hr)) {
             hit = true;
+            if (hr.t < closest) {
+                closest = hr.t;
+                color = surfaces[i]->getFill().color;
+            }
         }
     }
-    if (hit)
-        color = fill.color;
     return color;
 }
 
@@ -251,12 +262,6 @@ bool Triangle::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
         return false;
 
     hr.t = t;
-    hr.p = r.e + t * r.d;
-    hr.n = ba.cross(ca);
-    hr.n.normalize();
-    hr.alpha = 1.0 - beta - gamma;
-    hr.beta = beta;
-    hr.gamma = gamma;
     return true;
 
 }
@@ -270,7 +275,53 @@ void Poly::details(){
 
 // WIP
 bool Poly::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
-    return false;
+    vector<Eigen::Vector3d> v = verts;
+    vector<Triangle*> tri;
+    for (int i = 2; i < verts.size(); i++) {
+        Triangle* triangle = new Triangle(v[0], v[i-1], v[i]);
+        triangle->setFill(fill);
+        tri.push_back(triangle);
+    }
+    double closest = t1;
+    bool hit = false;
+    for (int i = 0; i < tri.size(); i++) {
+        if (tri[i]->hit(r, t0, t1, hr)){
+            hit = true;
+            if (hr.t < closest)
+                closest = hr.t;
+        }
+    }
+    if (hit)
+        hr.t = closest;
+    return hit;
+}
+
+void Sphere::details() {
+    cout << "Type: Sphere" << endl;
+    cout << "Center: ";
+    cout << c[0] << "\t" << c[1] << "\t" << c[2] << endl;
+    cout << "Radius: " << radius << endl << endl;
+}
+
+bool Sphere::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
+    Eigen::Vector3d temp = r.e-c;
+    double discriminant = sqrt(pow(r.d.dot(temp), 2) - (r.d.dot(r.d) * (temp.dot(temp)) - pow(radius, 2)));
+
+    if (discriminant < 0.0) 
+        return false;
+    double b = (-1 * r.d).dot(r.e - c);
+    double a = r.d.dot(r.d);
+    double small = (b - discriminant) / a;
+    double large = (b + discriminant) / a;
+    double t;
+    if (small >= t0 && small <= t1)
+        t = small;
+    else if (large >= t0 && large <= t1)
+        t = large;
+    else
+        return false;
+    hr.t = t;
+    return true;
 }
 
 int main(int argc, const char * argv[]) {
@@ -278,7 +329,7 @@ int main(int argc, const char * argv[]) {
         throw runtime_error("No input file given");
     }
     Tracer tracer(argv[1]);
-    tracer.details();
-    //tracer.createImage(argv[2]);
+    //tracer.details();
+    tracer.createImage(argv[2]);
     return 0;
 }

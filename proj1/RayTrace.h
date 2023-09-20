@@ -23,13 +23,9 @@ struct Ray {
 };
 
 struct HitRecord {
-    Eigen::Vector3d p;
-    Eigen::Vector3d n;
-    Eigen::Vector3d v;
+
     double t;
-    double alpha;
-    double beta;
-    double gamma;
+
 };
 
 class Surface {
@@ -62,11 +58,22 @@ private:
 class Poly: public Surface{
 public:
     Poly(vector<Eigen::Vector3d> vertices){ verts = vertices;}
-    Eigen::Vector3d getVertex(int i) {return verts[i];}
+    Eigen::Vector3d getVertex(int i) const {return verts[i];}
     void details();
     bool hit(const Ray &r, double t0, double t1, HitRecord &hr) const;
 private:
     vector<Eigen::Vector3d> verts;
+};
+
+class Sphere: public Surface{
+public:
+    Sphere(Eigen::Vector3d center, double r){ c = center; radius = r;}
+    void details();
+    bool hit(const Ray &r, double t0, double t1, HitRecord &hr) const;
+
+private:
+    Eigen::Vector3d c;
+    double radius;
 };
 
 
