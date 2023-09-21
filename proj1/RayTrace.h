@@ -85,6 +85,7 @@ public:
     Eigen::Vector3d castRay(const Ray &r, double t0, double t1) const;
     void createImage(const char * &fname);
     void details();
+    bool checkExtension(const string fname, string extension);
 
 private:
     Eigen::Vector3d eye;

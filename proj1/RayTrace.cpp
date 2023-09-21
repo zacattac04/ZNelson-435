@@ -13,6 +13,9 @@ double det(const Eigen::Vector3d &a, const Eigen::Vector3d &b, const Eigen::Vect
 // Reads all of the data from the nff file
 // except for the 'l' line. Not quite sure what that's for...
 Tracer::Tracer(const string &fname) {
+    bool valid = checkExtension(fname, ".nff");
+    if (!valid)
+        throw runtime_error("Invalid input file extension");
     ifstream istream(fname.c_str() ,ios_base::in);
     string line;
     char ch;
@@ -142,10 +145,9 @@ Eigen::Vector3d Tracer::castRay(const Ray &r, double t0, double t1) const {
 }
 
 // Sets up the camera and casts a ray for every pixel of the image
+// The pixel is set to the color of the closest intersecting surface
+// If the ray didn't intersect, it is set to the background color.
 // It then adds the pixel to the image, which it exports at the end
-// Currently, this is only set up to change the color to a default fill if the ray had an intersection
-// It doesn't really care if there is more than one intersection, since all surfaces are of the same type and color
-// This will have to be rectified in the future 
 void Tracer::createImage(const char * &fname) {
     Eigen::Vector3d w = eye - at;
     w /= w.norm();
@@ -162,9 +164,15 @@ void Tracer::createImage(const char * &fname) {
     int width = (int) res[0];
     unsigned char pixels[height][width][3];
     int progressCounter = 0;
-    int progressInterval  = (height*width)/25;
-    cout << "Drawing Image:" << endl;
-    cout << "-------------------------" << endl;
+    int intervalSize = 30;
+    int progressInterval  = (height*width)/intervalSize;
+    //cout << "Drawing Image:" << endl;
+    for (int i = 0; i < (intervalSize- 8)/2; i++) {cout << " ";}
+    cout << "PROGRESS" << endl;
+    cout << "0%";
+    for (int i = 0 ; i < intervalSize; i++) { cout << "-";}
+    cout << "100%" << endl;
+    cout << "  ";
     for (int i = 0; i <res[1]; i++){
         for (int j = 0; j<res[0]; j++) {
             double x = l + j*increment;
@@ -185,12 +193,18 @@ void Tracer::createImage(const char * &fname) {
             }
         }
     }
-    cout << endl << "done!" << endl;
+    cout << "done!" << endl;
     if (fname == nullptr) {
-        cout << "Output file not given. Writing to \"hide.ppm\"" << endl;
+        cout << "Output file not given. Writing to \"hide.ppm\"." << endl;
         fname = "hide.ppm";
     } else {
-        cout << "Writing to " << fname << endl;
+        bool valid = checkExtension(fname, ".ppm");
+        if (valid) {
+            cout << "Writing to " << fname << "." << endl;
+        } else {
+            cout << "Invalid output file extension. Writing to \"hide.ppm\"." << endl;
+            fname = "hide.ppm";
+        }
     }
     FILE *f = fopen(fname,"wb");
     fprintf(f, "P6\n%d %d\n%d\n", width, height, 255);
@@ -265,7 +279,7 @@ bool Triangle::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     return true;
 
 }
-
+// Shows the details of the polygon object
 void Poly::details(){
     cout << "Type: Polygon with " << verts.size() << " vertices" << endl;
     cout << "Color: " << endl;
@@ -273,7 +287,7 @@ void Poly::details(){
 
 }
 
-// WIP
+// Splits the polygons into a fan of triangles. It then checks to see if any of the triangles were hit, and returns the closest hit.
 bool Poly::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     vector<Eigen::Vector3d> v = verts;
     vector<Triangle*> tri;
@@ -296,6 +310,7 @@ bool Poly::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     return hit;
 }
 
+// Helper function to see if the sphere data was read properly.
 void Sphere::details() {
     cout << "Type: Sphere" << endl;
     cout << "Center: ";
@@ -303,6 +318,7 @@ void Sphere::details() {
     cout << "Radius: " << radius << endl << endl;
 }
 
+// Checks to see if the sphere was hit.
 bool Sphere::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     Eigen::Vector3d temp = r.e-c;
     double discriminant = sqrt(pow(r.d.dot(temp), 2) - (r.d.dot(r.d) * (temp.dot(temp)) - pow(radius, 2)));
@@ -324,6 +340,15 @@ bool Sphere::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     return true;
 }
 
+bool Tracer::checkExtension(const string fname, string extension) {
+    int index = fname.find('.');
+    if (index == -1)
+        return false;
+    if (fname.substr(index).compare(extension) != 0) {
+        return false;
+    }
+    return true;
+}
 int main(int argc, const char * argv[]) {
     if (argv[1] == nullptr) {
         throw runtime_error("No input file given");
