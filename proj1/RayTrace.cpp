@@ -20,6 +20,7 @@ Tracer::Tracer(const string &fname) {
     string line;
     char ch;
     int i = 0;
+    Fill fill;
     while (!istream.eof()){
         getline(istream, line);
         switch (line[0]) {
@@ -227,8 +228,6 @@ void Tracer::details(){
     cout << "Angle: " << angle << endl;
     cout << "Hither: " << hither << endl;
     cout << "Resolution: " << res[0] << "\t" << res[1] << endl << endl;
-    cout << "Fill Details: " << endl;
-    cout << "R: " << fill.color[0] << "\tB: " << fill.color[1] << "\tG: " << fill.color[2] << endl << endl;
     cout << "Surfaces:" << endl;
     
     for (int i = 0; i < surfaces.size(); i++) {

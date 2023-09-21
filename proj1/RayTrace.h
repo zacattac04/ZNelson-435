@@ -95,7 +95,6 @@ private:
     double hither;
     Eigen::Vector2d res;
     Eigen::Vector3d bcolor;
-    Fill fill;
     vector<Surface*> surfaces;
 };
 
