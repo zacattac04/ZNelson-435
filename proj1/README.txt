@@ -14,3 +14,6 @@ HOW TO RUN:
 ./RayTrace "inputFile.nff" "outputFile.ppm"
 If an output file is not given or has an invalid extension, it will default to "hide.ppm".
 If an input file is not given or has an invalid extension, it will throw a runtime error.
+
+NOTE:
+I have a progress bar to set up to make it clear that the program is working and not stalling. However, when I moved the code to the gl server to test functionality of *nix systems, it didn't print properly.
