@@ -149,12 +149,14 @@ Eigen::Vector3d Tracer::castRay(const Ray &r, double t0, double t1) const {
 // If the ray didn't intersect, it is set to the background color.
 // It then adds the pixel to the image, which it exports at the end
 void Tracer::createImage(const char * &fname) {
+    if (surfaces.size() >= 1000) {
+        cout << "NOTE: A very large volume of surfaces are in this file (1000+). This will likely take a very long time." << endl;
+    }
     Eigen::Vector3d w = eye - at;
     w /= w.norm();
     Eigen::Vector3d u = up.cross(w);
     u.normalize();
     Eigen::Vector3d v = w.cross(u);
-    //cout << "w: \n" << w << " u: \n" << u << "v: \n" << v << endl;
     double d = (eye - at).norm();
     double h = tan((M_PI/180.0) * (angle/2.0)) * d;
     double increment = (2*h) / res[0];
@@ -166,7 +168,6 @@ void Tracer::createImage(const char * &fname) {
     int progressCounter = 0;
     int intervalSize = 30;
     int progressInterval  = (height*width)/intervalSize;
-    //cout << "Drawing Image:" << endl;
     for (int i = 0; i < (intervalSize- 8)/2; i++) {cout << " ";}
     cout << "PROGRESS" << endl;
     cout << "0%";
