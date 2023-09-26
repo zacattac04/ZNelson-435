@@ -16,7 +16,7 @@ Tracer::Tracer(const string &fname) {
     bool valid = checkExtension(fname, ".nff");
     if (!valid)
         throw runtime_error("Invalid input file extension");
-    ifstream istream(fname.c_str() ,ios_base::in);
+    ifstream istream(fname.c_str(), ios_base::in);
     string line;
     char ch;
     int i = 0;
@@ -132,6 +132,13 @@ Tracer::Tracer(const string &fname) {
                 sphere->setFill(fill);
                 surfaces.push_back(sphere);
             }
+            case 'l': {
+                stringstream ss(line);
+                Eigen::Vector3d p;
+                ss>>ch>>p[0]>>p[1]>>p[2];
+                Light* l = new Light(p);
+                lights.push_back(l);
+            }
             default: {
                 break;
             }
@@ -148,20 +155,23 @@ Tracer::~Tracer(){
 }
 
 // Casts a Ray, and checks every object to see if it exists within its path
-// Currently, the only objects that exists are triangles, but this code is set up to expand to other surfaces
 Eigen::Vector3d Tracer::castRay(const Ray &r, double t0, double t1) const {
     HitRecord hr;
+    HitRecord best;
+    best.t = t1;
     Eigen::Vector3d color(bcolor);
     double closest = t1;
     bool hit = false;
     for (int i = 0; i<surfaces.size(); i++) {
         if  (surfaces[i]->hit(r, t0, t1, hr)) {
             hit = true;
-            if (hr.t < closest) {
-                closest = hr.t;
-                color = surfaces[i]->getFill().color;
+            if (hr.t < best.t) {
+                best = hr;
             }
         }
+    }
+    if (hit) {
+        color = best.f.color;
     }
     return color;
 }
@@ -297,6 +307,10 @@ bool Triangle::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
         return false;
 
     hr.t = t;
+    hr.p = r.e + t * r.d;
+    hr.n = ba.cross(ca);
+    hr.n.normalize();
+    hr.f = fill;
     return true;
 
 }
@@ -312,6 +326,8 @@ void Poly::details(){
 bool Poly::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     vector<Eigen::Vector3d> v = verts;
     vector<Triangle*> tri;
+    HitRecord best;
+    best.t = t1;
     for (int i = 2; i < verts.size(); i++) {
         Triangle* triangle = new Triangle(v[0], v[i-1], v[i]);
         triangle->setFill(fill);
@@ -322,12 +338,12 @@ bool Poly::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     for (int i = 0; i < tri.size(); i++) {
         if (tri[i]->hit(r, t0, t1, hr)){
             hit = true;
-            if (hr.t < closest)
-                closest = hr.t;
+            if (hr.t < best.t)
+                best = hr;
         }
     }
     if (hit)
-        hr.t = closest;
+        hr = best;
     return hit;
 }
 
@@ -343,22 +359,23 @@ void PolyPatch::details(){
 bool PolyPatch::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     vector<Eigen::Vector3d> v = verts;
     vector<Triangle*> tri;
+    HitRecord best;
+    best.t = t1;
     for (int i = 2; i < verts.size(); i++) {
         Triangle* triangle = new Triangle(v[0], v[i-1], v[i]);
         triangle->setFill(fill);
         tri.push_back(triangle);
     }
-    double closest = t1;
     bool hit = false;
     for (int i = 0; i < tri.size(); i++) {
         if (tri[i]->hit(r, t0, t1, hr)){
             hit = true;
-            if (hr.t < closest)
-                closest = hr.t;
+            if (hr.t < best.t)
+                best = hr;
         }
     }
     if (hit)
-        hr.t = closest;
+        hr = best;
     return hit;
 }
 
@@ -389,6 +406,10 @@ bool Sphere::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     else
         return false;
     hr.t = t;
+    hr.p = r.e + t * r.d;
+    hr.n = c - hr.p;
+    hr.n.normalize();
+    hr.f = fill;
     return true;
 }
 
@@ -406,7 +427,7 @@ int main(int argc, const char * argv[]) {
         throw runtime_error("No input file given");
     }
     Tracer tracer(argv[1]);
-    tracer.details();
-    //tracer.createImage(argv[2]);
+    //tracer.details();
+    tracer.createImage(argv[2]);
     return 0;
 }

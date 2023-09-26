@@ -23,8 +23,10 @@ struct Ray {
 };
 
 struct HitRecord {
-
+    Eigen::Vector3d n;
+    Eigen::Vector3d p;
     double t;
+    Fill f;
 
 };
 
@@ -117,6 +119,7 @@ private:
     Eigen::Vector2d res;
     Eigen::Vector3d bcolor;
     vector<Surface*> surfaces;
+    vector<Light*> lights;
 };
 
 #endif
