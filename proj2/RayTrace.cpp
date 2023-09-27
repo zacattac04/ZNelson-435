@@ -79,9 +79,11 @@ Tracer::Tracer(const string &fname) {
                         verts.push_back(v);
                         norms.push_back(n);
                     }
-                    PolyPatch * patch = new PolyPatch(verts, norms);
-                    patch->setFill(fill);
-                    surfaces.push_back(patch);
+                    //PolyPatch * patch = new PolyPatch(verts, norms);
+                    //patch->setFill(fill);
+		            //surfaces.push_back(patch);
+                    surfaces.push_back(new PolyPatch(verts, norms));
+                    surfaces.back()->setFill(fill);
                 } else {
                     stringstream ss(line);
                     int numCoords;
@@ -103,7 +105,6 @@ Tracer::Tracer(const string &fname) {
                         css>>C[0]>>C[1]>>C[2];
                         Triangle* triangle = new Triangle(A, B, C);
                         triangle->setFill(fill);
-                        //surfaces.push_back(new Triangle(A, B, C));
                         surfaces.push_back(triangle);
                     } else if (numCoords > 3) {
                         vector<Eigen::Vector3d> verts;
@@ -115,9 +116,11 @@ Tracer::Tracer(const string &fname) {
                             ss>>v[0]>>v[1]>>v[2];
                             verts.push_back(v);
                         }
-                        Poly* poly = new Poly(verts);
-                        poly->setFill(fill);
-                        surfaces.push_back(poly);
+                        //Poly* poly = new Poly(verts);
+                        //poly->setFill(fill);
+                        //surfaces.push_back(poly);
+                        surfaces.push_back(new Poly(verts));
+                        surfaces.back()->setFill(fill);
 
                     }
                 }
@@ -136,7 +139,8 @@ Tracer::Tracer(const string &fname) {
                 stringstream ss(line);
                 Eigen::Vector3d p;
                 ss>>ch>>p[0]>>p[1]>>p[2];
-                Light* l = new Light(p);
+                Light l;
+                l.p = p;
                 lights.push_back(l);
             }
             default: {
@@ -171,9 +175,50 @@ Eigen::Vector3d Tracer::castRay(const Ray &r, double t0, double t1) const {
         }
     }
     if (hit) {
-        color = best.f.color;
+        color = shade(best);
     }
     return color;
+}
+
+
+bool Tracer::castShadow(const Ray &r, double t0, double t1) const {
+    HitRecord hr;
+    HitRecord best;
+    Eigen::Vector3d color(bcolor);
+    double closest = t1;
+    bool hit = false;
+    for (int i = 0; i<surfaces.size(); i++) {
+        if  (surfaces[i]->hit(r, t0, t1, hr)) {
+            return true;
+        }
+    }
+    return false;
+}
+Eigen::Vector3d Tracer::shade(const HitRecord &hr) const {
+    double lightIntensity = 1.0/sqrt(lights.size());
+    Eigen::Vector3d localColor(0,0,0);
+    Fill f = hr.f;
+    for (int i = 0; i < lights.size(); i++) {
+        Eigen::Vector3d L = lights[i].p - hr.p;
+        L.normalize();
+        Ray r;
+        r.e = hr.p;
+        r.d = L;
+
+        Eigen::Vector3d H = L + hr.v;
+        H.normalize();
+        if (!castShadow(r, 0.1, 1000)) {
+            double diffuse = max(0.0, hr.n.dot(L));
+            double specular = pow(max(0.0, hr.n.dot(H)), f.e);
+            localColor[0] += (f.kd *f.color[0]*diffuse + f.ks*specular) * lightIntensity;
+            localColor[1] += (f.kd *f.color[1]*diffuse + f.ks*specular) * lightIntensity;
+            localColor[2] += (f.kd *f.color[2]*diffuse + f.ks*specular) * lightIntensity;
+        }
+    }
+    localColor[0] = min(1.0, localColor[0]);
+    localColor[1] = min(1.0, localColor[1]);
+    localColor[2] = min(1.0, localColor[2]);
+    return localColor;
 }
 
 // Sets up the camera and casts a ray for every pixel of the image
@@ -198,14 +243,15 @@ void Tracer::createImage(const char * &fname) {
     int width = (int) res[0];
     unsigned char pixels[height][width][3];
     int progressCounter = 0;
-    int intervalSize = 30;
-    int progressInterval  = (height*width)/intervalSize;
+    int intervalSize = 20;
+    int progressInterval  = (height*width)/(intervalSize*10);
+    int largeCounter = 0;
     for (int i = 0; i < (intervalSize- 8)/2; i++) {cout << " ";}
     cout << "PROGRESS" << endl;
-    cout << "0%";
+    cout << "";
     for (int i = 0 ; i < intervalSize; i++) { cout << "-";}
-    cout << "100%" << endl;
-    cout << "  ";
+    cout << "0%" << endl;
+    cout << "";
     for (int i = 0; i <res[1]; i++){
         for (int j = 0; j<res[0]; j++) {
             double x = l + j*increment;
@@ -221,8 +267,12 @@ void Tracer::createImage(const char * &fname) {
             pixels[i][j][1] = pixel[1] * 255;
             pixels[i][j][2] = pixel[2] * 255;
             progressCounter++;
-            if (progressCounter % progressInterval == 0) {
-                cout << "*";
+            if (progressCounter % (progressInterval) == 0) {
+	            cout << "*";
+                if (progressCounter % (progressInterval * intervalSize) == 0) {
+                    largeCounter++;
+                    cout << (largeCounter * 10) << "%" << endl << "";
+                }
             }
         }
     }
@@ -259,12 +309,25 @@ void Tracer::details(){
     cout << "Angle: " << angle << endl;
     cout << "Hither: " << hither << endl;
     cout << "Resolution: " << res[0] << "\t" << res[1] << endl << endl;
-    cout << "Surfaces:" << endl;
+    cout << "Number of Surfaces: " << surfaces.size() << endl;
+    int numTriangles = 0;
+    int numPoly = 0;
+    int numSphere = 0;
+    int numPatch = 0;
+
     
     for (int i = 0; i < surfaces.size(); i++) {
-        surfaces[i]->details();
+        //surfaces[i]->details();
+        if (surfaces[i]->getType() == "Triangle") numTriangles++;
+        if (surfaces[i]->getType() == "Poly") numPoly++;
+        if (surfaces[i]->getType() == "Sphere") numSphere++;
+        if (surfaces[i]->getType() == "PolyPatch") numPatch++;
     }
-
+    if (numTriangles > 0) cout << "Number of Triangles: " << numTriangles << endl; 
+    if (numPoly > 0) cout << "Number of Polygons: " << numPoly << endl;
+    if (numSphere > 0) cout << "Number of Spheres: " << numSphere << endl;
+    if (numPatch > 0) cout << "Number of Polygonal Patches: " << numPatch << endl;    
+    
 }
 
 
@@ -310,6 +373,8 @@ bool Triangle::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     hr.p = r.e + t * r.d;
     hr.n = ba.cross(ca);
     hr.n.normalize();
+    hr.v = r.e - hr.p;
+    hr.v.normalize();
     hr.f = fill;
     return true;
 
@@ -321,6 +386,7 @@ void Poly::details(){
     cout << "R: " << fill.color[0] << "\tB: " << fill.color[1] << "\tG: " << fill.color[2] << endl << endl;
 
 }
+
 
 // Splits the polygons into a fan of triangles. It then checks to see if any of the triangles were hit, and returns the closest hit.
 bool Poly::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
@@ -344,6 +410,9 @@ bool Poly::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     }
     if (hit)
         hr = best;
+    for (int i  = 0; i < tri.size(); i++) {
+      delete tri[i];
+    }
     return hit;
 }
 
@@ -376,6 +445,9 @@ bool PolyPatch::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     }
     if (hit)
         hr = best;
+    for (int i = 0; i < tri.size(); i++) {
+      delete tri[i];
+    }
     return hit;
 }
 
@@ -407,8 +479,10 @@ bool Sphere::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
         return false;
     hr.t = t;
     hr.p = r.e + t * r.d;
-    hr.n = c - hr.p;
+    hr.n = hr.p - c;
     hr.n.normalize();
+    hr.v = r.e - hr.p;
+    hr.v.normalize();
     hr.f = fill;
     return true;
 }
