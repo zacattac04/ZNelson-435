@@ -20,12 +20,14 @@ struct Fill {
 struct Ray {
     Eigen::Vector3d e;
     Eigen::Vector3d d;
+    int depth = 0;
 };
 
 struct HitRecord {
     Eigen::Vector3d n;
     Eigen::Vector3d p;
     Eigen::Vector3d v;
+    int rayDepth;
     double t;
     Fill f;
 
@@ -56,7 +58,7 @@ protected:
 class Triangle: public Surface{
 public:
     Triangle();
-    Triangle(Eigen::Vector3d& A, Eigen::Vector3d& B, Eigen::Vector3d& C);
+    Triangle(Eigen::Vector3d& A, Eigen::Vector3d& B, Eigen::Vector3d& C) {a = A; b = B; c = C; type = "Triangle";};
     void details();
     bool hit(const Ray &r, double t0, double t1, HitRecord &hr) const;
 private:
