@@ -11,7 +11,9 @@ double det(const Eigen::Vector3d &a, const Eigen::Vector3d &b, const Eigen::Vect
 }
 
 // Reads all of the data from the nff file
-// except for the 'l' line. Not quite sure what that's for...
+// All surfaces (Polygons, Polygon patches, spheres) are placed in the surfaces vector
+// Light objects are placed in the light vector
+// The fill is stored temporarily, and used to initialize the fill of all proceeding surfaces
 Tracer::Tracer(const string &fname) {
     bool valid = checkExtension(fname, ".nff");
     if (!valid)
@@ -79,9 +81,8 @@ Tracer::Tracer(const string &fname) {
                         verts.push_back(v);
                         norms.push_back(n);
                     }
-                    PolyPatch * patch = new PolyPatch(verts, norms);
-                    patch->setFill(fill);
-                    surfaces.push_back(patch);
+                    surfaces.push_back(new PolyPatch(verts, norms));
+                    surfaces.back()->setFill(fill);
                 } else {
                     stringstream ss(line);
                     int numCoords;
@@ -101,23 +102,19 @@ Tracer::Tracer(const string &fname) {
                         stringstream css(line);
                         Eigen::Vector3d C;
                         css>>C[0]>>C[1]>>C[2];
-                        Triangle* triangle = new Triangle(A, B, C);
-                        triangle->setFill(fill);
-                        //surfaces.push_back(new Triangle(A, B, C));
-                        surfaces.push_back(triangle);
+                        surfaces.push_back(new Triangle(A,B,C));
+                        surfaces.back()->setFill(fill);
                     } else if (numCoords > 3) {
                         vector<Eigen::Vector3d> verts;
                         for (int i = 0; i < numCoords; i++) {
-                            //cout << "reading vertex" << (i+1) << endl;
                             getline(istream, line);
                             stringstream ss(line);
                             Eigen::Vector3d v;
                             ss>>v[0]>>v[1]>>v[2];
                             verts.push_back(v);
                         }
-                        Poly* poly = new Poly(verts);
-                        poly->setFill(fill);
-                        surfaces.push_back(poly);
+                        surfaces.push_back(new Poly(verts));
+                        surfaces.back()->setFill(fill);
 
                     }
                 }
@@ -128,15 +125,15 @@ Tracer::Tracer(const string &fname) {
                 Eigen::Vector3d c;
                 double r;
                 ss>>ch>>c[0]>>c[1]>>c[2]>>r;
-                Sphere* sphere = new Sphere(c, r);
-                sphere->setFill(fill);
-                surfaces.push_back(sphere);
+                surfaces.push_back(new Sphere(c, r));
+                surfaces.back()->setFill(fill);
             }
             case 'l': {
                 stringstream ss(line);
                 Eigen::Vector3d p;
                 ss>>ch>>p[0]>>p[1]>>p[2];
-                Light* l = new Light(p);
+                Light l;
+                l.p = p;
                 lights.push_back(l);
             }
             default: {
@@ -155,6 +152,7 @@ Tracer::~Tracer(){
 }
 
 // Casts a Ray, and checks every object to see if it exists within its path
+// It then returns the color of the polygon that is closest, shaded appropriately
 Eigen::Vector3d Tracer::castRay(const Ray &r, double t0, double t1) const {
     HitRecord hr;
     HitRecord best;
@@ -171,9 +169,65 @@ Eigen::Vector3d Tracer::castRay(const Ray &r, double t0, double t1) const {
         }
     }
     if (hit) {
-        color = best.f.color;
+        color = shade(best);
     }
     return color;
+}
+
+// A stripped down version of castRay
+// When checking for shadows, we don't care about any information from the polygon it hits
+// We simply want to know if a polygon exists in the path
+// Returns true if a polygon was found, false otherwise
+bool Tracer::castShadow(const Ray &r, double t0, double t1) const {
+    HitRecord hr;
+    for (int i = 0; i<surfaces.size(); i++) {
+        if  (surfaces[i]->hit(r, t0, t1, hr)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+// This will modify the color of the pixel based on the specular and diffuse mapping
+// As well as any reflections that might exist (up to 5 reflections per pixel)
+// It returns the color at the end
+Eigen::Vector3d Tracer::shade(const HitRecord &hr) const {
+    double lightIntensity = 1.0/sqrt(lights.size());
+    Eigen::Vector3d localColor(0,0,0);
+    Fill f = hr.f;
+    for (int i = 0; i < lights.size(); i++) {
+        Eigen::Vector3d L = lights[i].p - hr.p;
+        L.normalize();
+        Ray r;
+        r.e = hr.p;
+        r.d = L;
+
+        Eigen::Vector3d H = L + hr.v;
+        H.normalize();
+        if (!castShadow(r, 0.1, 1000)) {
+            double diffuse = max(0.0, hr.n.dot(L));
+            double specular = pow(max(0.0, hr.n.dot(H)), f.e);
+            localColor[0] += (f.kd *f.color[0]*diffuse + f.ks*specular) * lightIntensity;
+            localColor[1] += (f.kd *f.color[1]*diffuse + f.ks*specular) * lightIntensity;
+            localColor[2] += (f.kd *f.color[2]*diffuse + f.ks*specular) * lightIntensity;
+        }
+    }
+    Eigen::Vector3d totalColor(localColor);
+    if (f.ks > 0 && hr.rayDepth < 5) {
+        Ray reflect;
+        reflect.depth = hr.rayDepth + 1;
+        reflect.e = hr.p;
+        Eigen::Vector3d d = -1 * hr.v;
+        reflect.d = d - 2 * ((d.dot(hr.n)) * hr.n);
+        totalColor += f.ks*(castRay(reflect, 0.1, 1000));
+    }
+    // It is possible for the RGB values to exceed 1
+    // Therefore we must clamp the values to prevent overflow 
+    totalColor[0] = clamp(totalColor[0], 0.0, 1.0);
+    totalColor[1] = clamp(totalColor[1], 0.0, 1.0);
+    totalColor[2] = clamp(totalColor[2], 0.0, 1.0);
+    return totalColor;
+
 }
 
 // Sets up the camera and casts a ray for every pixel of the image
@@ -198,14 +252,15 @@ void Tracer::createImage(const char * &fname) {
     int width = (int) res[0];
     unsigned char pixels[height][width][3];
     int progressCounter = 0;
-    int intervalSize = 30;
-    int progressInterval  = (height*width)/intervalSize;
+    int intervalSize = 20;
+    int progressInterval  = (height*width)/(intervalSize*10);
+    int largeCounter = 0;
     for (int i = 0; i < (intervalSize- 8)/2; i++) {cout << " ";}
     cout << "PROGRESS" << endl;
-    cout << "0%";
+    cout << "";
     for (int i = 0 ; i < intervalSize; i++) { cout << "-";}
-    cout << "100%" << endl;
-    cout << "  ";
+    cout << "0%" << endl;
+    cout << "";
     for (int i = 0; i <res[1]; i++){
         for (int j = 0; j<res[0]; j++) {
             double x = l + j*increment;
@@ -221,8 +276,12 @@ void Tracer::createImage(const char * &fname) {
             pixels[i][j][1] = pixel[1] * 255;
             pixels[i][j][2] = pixel[2] * 255;
             progressCounter++;
-            if (progressCounter % progressInterval == 0) {
-                cout << "*";
+            if (progressCounter % (progressInterval) == 0) {
+	            cout << "*";
+                if (progressCounter % (progressInterval * intervalSize) == 0) {
+                    largeCounter++;
+                    cout << (largeCounter * 10) << "%" << endl << "";
+                }
             }
         }
     }
@@ -259,12 +318,25 @@ void Tracer::details(){
     cout << "Angle: " << angle << endl;
     cout << "Hither: " << hither << endl;
     cout << "Resolution: " << res[0] << "\t" << res[1] << endl << endl;
-    cout << "Surfaces:" << endl;
+    cout << "Number of Surfaces: " << surfaces.size() << endl;
+    int numTriangles = 0;
+    int numPoly = 0;
+    int numSphere = 0;
+    int numPatch = 0;
+
     
     for (int i = 0; i < surfaces.size(); i++) {
-        surfaces[i]->details();
+        //surfaces[i]->details();
+        if (surfaces[i]->getType() == "Triangle") numTriangles++;
+        if (surfaces[i]->getType() == "Poly") numPoly++;
+        if (surfaces[i]->getType() == "Sphere") numSphere++;
+        if (surfaces[i]->getType() == "PolyPatch") numPatch++;
     }
-
+    if (numTriangles > 0) cout << "Number of Triangles: " << numTriangles << endl; 
+    if (numPoly > 0) cout << "Number of Polygons: " << numPoly << endl;
+    if (numSphere > 0) cout << "Number of Spheres: " << numSphere << endl;
+    if (numPatch > 0) cout << "Number of Polygonal Patches: " << numPatch << endl;    
+    
 }
 
 
@@ -280,17 +352,9 @@ void Triangle::details() {
     //cout << c[0] << "\t" << c[1] << "\t" << c[2] << endl;
 }
 
-// Simple constructor for the Triangle class. probably could be done better
-Triangle::Triangle(Eigen::Vector3d& A, Eigen::Vector3d& B, Eigen::Vector3d& C) {
-    a = A;
-    b = B;
-    c = C;
-    type = "Triangle";
-
-}
-
 // Checks to see if the Ray hits this Triangle
-// If it was hit, it records the details in the HitRecord
+// If it was hit, it records the details in the HitRecord and returns true
+// Otherwise it returns false
 bool Triangle::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     Eigen::Vector3d ba = a-b;
     Eigen::Vector3d ca = a-c;
@@ -310,10 +374,14 @@ bool Triangle::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     hr.p = r.e + t * r.d;
     hr.n = ba.cross(ca);
     hr.n.normalize();
+    hr.v = r.e - hr.p;
+    hr.v.normalize();
     hr.f = fill;
+    hr.rayDepth = r.depth;
     return true;
 
 }
+
 // Shows the details of the polygon object
 void Poly::details(){
     cout << "Type: Polygon with " << verts.size() << " vertices" << endl;
@@ -321,6 +389,7 @@ void Poly::details(){
     cout << "R: " << fill.color[0] << "\tB: " << fill.color[1] << "\tG: " << fill.color[2] << endl << endl;
 
 }
+
 
 // Splits the polygons into a fan of triangles. It then checks to see if any of the triangles were hit, and returns the closest hit.
 bool Poly::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
@@ -344,10 +413,13 @@ bool Poly::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     }
     if (hit)
         hr = best;
+    for (int i  = 0; i < tri.size(); i++) {
+      delete tri[i];
+    }
     return hit;
 }
 
-// Shows the details of the polygon object
+// Shows the details of the polygon Patch object
 void PolyPatch::details(){
     cout << "Type: Polygonal patch with " << verts.size() << " vertices" << endl;
     cout << "Color: " << endl;
@@ -376,6 +448,9 @@ bool PolyPatch::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     }
     if (hit)
         hr = best;
+    for (int i = 0; i < tri.size(); i++) {
+      delete tri[i];
+    }
     return hit;
 }
 
@@ -388,6 +463,8 @@ void Sphere::details() {
 }
 
 // Checks to see if the sphere was hit.
+// If it was hit, it records the details in the HitRecord and returns true
+// Otherwise it returns false
 bool Sphere::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
     Eigen::Vector3d temp = r.e-c;
     double discriminant = sqrt(pow(r.d.dot(temp), 2) - (r.d.dot(r.d) * (temp.dot(temp)) - pow(radius, 2)));
@@ -407,12 +484,17 @@ bool Sphere::hit(const Ray &r, double t0, double t1, HitRecord &hr) const {
         return false;
     hr.t = t;
     hr.p = r.e + t * r.d;
-    hr.n = c - hr.p;
+    hr.n = hr.p - c;
     hr.n.normalize();
+    hr.v = r.e - hr.p;
+    hr.v.normalize();
     hr.f = fill;
+    hr.rayDepth = r.depth;
     return true;
 }
 
+// A simple function to check if the file name extension is valid
+// Returns true if the extension is correct, false otherwise
 bool Tracer::checkExtension(const string fname, string extension) {
     int index = fname.find('.');
     if (index == -1)
@@ -422,6 +504,7 @@ bool Tracer::checkExtension(const string fname, string extension) {
     }
     return true;
 }
+
 int main(int argc, const char * argv[]) {
     if (argv[1] == nullptr) {
         throw runtime_error("No input file given");
