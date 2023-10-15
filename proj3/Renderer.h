@@ -57,6 +57,10 @@ private:
     Eigen::Vector3d bcolor;
     vector<Triangle*> triangles;
     vector<Light> lights;
+    Eigen::Matrix4d M_vp;
+    Eigen::Matrix4d M_per;
+    Eigen::Matrix4d M_cam;
+    Eigen::Matrix4d M;
 };
 
 #endif

@@ -22,6 +22,12 @@ Renderer::Renderer(const string &fname) {
     char ch;
     int i = 0;
     Fill fill;
+    /*
+    M_cam = Eigen::Matrix4d::Zero();
+    M_per = Eigen::Matrix4d::Zero();
+    M_vp = Eigen::Matrix4d::Zero();
+    M = Eigen::Matrix4d::Zero();
+    */
     while (!istream.eof()){
         getline(istream, line);
         switch (line[0]) {
@@ -55,6 +61,40 @@ Renderer::Renderer(const string &fname) {
                 getline(istream,line);
                 stringstream resss(line);
                 resss>>junk>>res[0]>>res[1];
+
+                M_vp << res[0] / 2, 0, 0, (res[0]-1)/2,
+                        0, res[1] / 2, 0, (res[1]-1)/2,
+                        0, 0, 1, 0,
+                        0, 0, 0, 1;
+                Eigen::Vector3d w = eye - at;
+                w /= w.norm();
+                Eigen::Vector3d u = up.cross(w);
+                u.normalize();
+                Eigen::Vector3d v = w.cross(u);
+                M_cam << u[0], u[1], u[2], 0,
+                         v[0], v[1], v[2], 0,
+                         w[0], w[1], w[2], 0,
+                         0, 0, 0, 1;
+                Eigen::Matrix4d M_inv;
+                M_inv << 1, 0, 0, -1 * eye[0],
+                         0, 1, 0, -1 * eye[1],
+                         0, 0, 1, -1 * eye[2],
+                         0, 0, 0, 1;
+                M_cam = M_cam * M_inv;
+
+                double d = (eye - at).norm();
+                double h = tan((M_PI/180.0) * (angle/2.0)) * d;
+                double increment = (2*h) / res[0];
+                double l = -h + 0.5*increment;
+                double t = h*(((double)res[1])/res[0]) - 0.5*increment;
+                double r = h - 0.5*increment;
+                double b = -h*(((double)res[1])/res[0]) + 0.5*increment;
+                double f = 10000;
+                M_per << (2 * hither) / (r-l), 0, (l+r) / (r-l), 0,
+                         0, (2 * hither) / (t-b), (b+t) / (b-t), 0,
+                         0, 0, (f + hither) / (hither - f), (2 * f * hither) / (f - hither),
+                         0, 0, 1, 0;
+                M = M_vp * M_per * M_cam;
                 break;
             }
 
@@ -161,6 +201,21 @@ void Renderer::details(){
     cout << "Hither: " << hither << endl;
     cout << "Resolution: " << res[0] << "\t" << res[1] << endl << endl;
     cout << "Number of triangles: " << triangles.size() << endl;
+
+    double d = (eye - at).norm();
+    double h = tan((M_PI/180.0) * (angle/2.0)) * d;
+    double increment = (2*h) / res[0];
+    double l = -h + 0.5*increment;
+    double t = h*(((double)res[1])/res[0]) - 0.5*increment;
+    cout << "d: " << d << endl;
+    cout << "h: " << h << endl;
+    cout << "increment: " << increment << endl;
+    cout << "l: " << l << endl;
+    cout << "t: " << t << endl;
+    cout << "M_vp: \n" << M_vp << endl;
+    cout << "M_cam: \n" << M_cam << endl;
+    cout << "M_per: \n" << M_per << endl;
+    cout << "M: \n" << M << endl;
     
 } 
 
