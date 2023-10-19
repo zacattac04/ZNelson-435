@@ -93,13 +93,11 @@ Renderer::Renderer(const string &fname) {
                          u[2], v[2], w[2], eye[2],
                          0, 0, 0, 1;
                 M_cam = M_cam.inverse().eval();
-                double d = (eye - at).norm();
-                double h = tan((M_PI/180.0) * (angle/2.0)) * d;
-                double increment = (2*h) / res[0];
-                double l = -h + 0.5*increment;
-                double t = h*(((double)res[1])/res[0]) - 0.5*increment;
-                double r = h - 0.5*increment;
-                double b = -h*(((double)res[1])/res[0]) + 0.5*increment;
+
+                double l = -tan((M_PI/180.0) * (angle/2.0)) * hither;
+                double r = tan((M_PI/180.0) * (angle/2.0)) * hither;
+                double t = tan((M_PI/180.0) * (angle/2.0)) * hither;
+                double b = -tan((M_PI/180.0) * (angle/2.0)) * hither;
                 double f = 100;
                 double n = -hither;
                 M_per << (2 * n) / (r-l), 0, (l+r) / (r-l), 0,
@@ -217,7 +215,14 @@ void Renderer::vertexProcessing(bool shading) {
                     p = t->c;
                     n = t->nc;
                 }
+                if (n == Eigen::Vector3d::Zero()) {
+                    Eigen::Vector3d ba = t->a-t->b;
+                    Eigen::Vector3d ca = t->a-t->c;
+                    n = ba.cross(ca);
+                    n.normalize();
+                }
                 t->color[j] = shade(p, n, t->getFill());
+
 
 
             }
@@ -297,15 +302,80 @@ void Renderer::rasterizer(const Triangle &t) {
                 if ((alpha > 0 || falpha*line(p[1][0],p[1][1], p[2][0], p[2][1], -1.0, -1.0) > 0) &&
                     (beta  > 0 ||  fbeta*line(p[2][0],p[2][1], p[0][0], p[0][1], -1.0, -1.0) > 0) &&
                     (gamma > 0 || fgamma*line(p[0][0],p[0][1], p[1][0], p[1][1], -1.0, -1.0) > 0)) {
-                        Fragment f;
-                        f.z = alpha*p[0][2] + beta*p[1][2] + gamma*p[2][2];
-                        f.color = alpha*t.color[0] + beta*t.color[1] + gamma*t.color[2];
-                        fragments[i*res[0] + j].push_back(f);
-                    }
+
+                    Fragment f;
+                    f.z = alpha*p[0][2] + beta*p[1][2] + gamma*p[2][2];
+                    f.color = alpha*t.color[0] + beta*t.color[1] + gamma*t.color[2];
+                    fragments[i*(int)res[0] + j].push_back(f);
+                }
             }
         }
     }
 }
+
+Eigen::Vector3d *Renderer::blender() {
+    int height = (int) res[1];
+    int width = (int) res[0];
+    Eigen::Vector3d *im = new Eigen::Vector3d[width * height];
+    for (int i = 0; i < height; i++) {
+        for (int j = 0; j < width; j++) {
+            vector<Fragment> &frags = fragments[i*width+j];
+            double z = -100000;
+            im[i*width + j] = bcolor;
+            for (int k = 0; k < frags.size(); k++) {
+                if (frags[k].z > z) {
+                    z = frags[k].z;
+                    im[i*width + j] = frags[k].color;
+                }
+            }
+        }
+    }
+    return im;
+}
+
+void Renderer::createImage(const char * &fname) {
+    cout << "Processing Vertices... ";
+    vertexProcessing(true);
+    cout << "Done!" << endl;
+    cout << "Rasterizing... "; 
+    for (int i = 0; i < triangles.size(); i++) {
+        rasterizer(*triangles[i]);
+    }
+    cout << "Done!" << endl;
+    cout << "Blending... ";
+    Eigen::Vector3d *im = blender();
+    cout << "Done!" << endl;
+    int height = (int) res[1];
+    int width = (int) res[0];
+    unsigned char pixels[height][width][3];
+    for (int i = 0; i < res[1]; i++) {
+        for (int j = 0; j < res[0]; j++) {
+            Eigen::Vector3d pixel = im[i*(int)res[0] + j];
+            pixels[height-1-i][j][0] = pixel[0] * 255;
+            pixels[height-1-i][j][1] = pixel[1] * 255;
+            pixels[height-1-i][j][2] = pixel[2] * 255;
+        }
+    }
+    if (fname == nullptr) {
+        cout << "Output file not given. Writing to \"hide.ppm\"." << endl;
+        fname = "hide.ppm";
+    } else {
+        bool valid = checkExtension(fname, ".ppm");
+        if (valid) {
+            cout << "Writing to " << fname << "." << endl;
+        } else {
+            cout << "Invalid output file extension. Writing to \"hide.ppm\"." << endl;
+            fname = "hide.ppm";
+        }
+    }
+    FILE *f = fopen(fname,"wb");
+    fprintf(f, "P6\n%d %d\n%d\n", width, height, 255);
+    fwrite(pixels, 1, height*width*3, f);
+    fclose(f);
+
+
+}
+
 // A class that prints all of the details read from the nff file
 // Isn't utilized in the current code, was just to check if the file was being read properly
 void Renderer::details(){
@@ -335,7 +405,7 @@ void Renderer::details(){
     cout << "M_per: \n" << M_per << endl;
     cout << "M: \n" << M << endl;
 
-    for (int i = 0; i < 30; i++) {
+    for (int i = 0; i < 6; i++) {
         triangles[i]->details();
     }
     
@@ -368,6 +438,7 @@ int main(int argc, const char * argv[]) {
         throw runtime_error("No input file given");
     }
     Renderer renderer(argv[1]);
-    renderer.details();
+    renderer.createImage(argv[2]);
+    //renderer.details();
     return 0;
 }

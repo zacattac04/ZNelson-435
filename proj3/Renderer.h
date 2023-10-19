@@ -54,6 +54,8 @@ public:
     void vertexProcessing(bool shading);
     Eigen::Vector3d shade(Eigen::Vector3d p, Eigen::Vector3d n, Fill f);
     void rasterizer(const Triangle &t);
+    Eigen::Vector3d *blender();
+    void createImage(const char * &fname);
     void details();
     bool checkExtension(const string fname, string extension);
 
