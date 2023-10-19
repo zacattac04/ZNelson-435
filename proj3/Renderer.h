@@ -25,14 +25,18 @@ struct Light {
 class Triangle{
 public:
     Triangle();
-    Triangle(Eigen::Vector3d& A, Eigen::Vector3d& B, Eigen::Vector3d& C) {a = A; b = B; c = C;};
+    Triangle(Eigen::Vector4d& A, Eigen::Vector4d& B, Eigen::Vector4d& C) {a = A; b = B; c = C;};
+    Triangle(Eigen::Vector4d& A, Eigen::Vector4d& B, Eigen::Vector4d& C, Eigen::Vector4d &NA, Eigen::Vector4d &NB, Eigen::Vector4d &NC) {a = A; b = B; c = C; na = NA; nb = NB; nc = NC;};
     void details();
     void setFill(Fill f) {fill = f;}
     Fill getFill() {return fill;}
 private:
-    Eigen::Vector3d a;
-    Eigen::Vector3d b;
-    Eigen::Vector3d c;
+    Eigen::Vector4d a;
+    Eigen::Vector4d b;
+    Eigen::Vector4d c;
+    Eigen::Vector4d na;
+    Eigen::Vector4d nb;
+    Eigen::Vector4d nc;
     Fill fill;
 };
 

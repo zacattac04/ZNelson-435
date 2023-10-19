@@ -89,7 +89,7 @@ Renderer::Renderer(const string &fname) {
                 double t = h*(((double)res[1])/res[0]) - 0.5*increment;
                 double r = h - 0.5*increment;
                 double b = -h*(((double)res[1])/res[0]) + 0.5*increment;
-                double f = 10000;
+                double f = 10;
                 M_per << (2 * hither) / (r-l), 0, (l+r) / (r-l), 0,
                          0, (2 * hither) / (t-b), (b+t) / (b-t), 0,
                          0, 0, (f + hither) / (hither - f), (2 * f * hither) / (f - hither),
@@ -109,19 +109,22 @@ Renderer::Renderer(const string &fname) {
                     int numCoords;
                     string junk;
                     ss>>junk>>numCoords;
-                    vector<Eigen::Vector3d> verts;
-                    vector<Eigen::Vector3d> norms;
+                    vector<Eigen::Vector4d> verts;
+                    vector<Eigen::Vector4d> norms;
                     for (int i = 0; i < numCoords; i++) {
                         getline(istream, line);
                         stringstream ss(line);
-                        Eigen::Vector3d v;
-                        Eigen::Vector3d n;
+                        Eigen::Vector4d v;
+                        Eigen::Vector4d n;
                         ss>>v[0]>>v[1]>>v[2]>>n[0]>>n[1]>>n[2];
+                        v[3] = 1;
+                        n[3] = 1;
+                        v = M * v;
                         verts.push_back(v);
                         norms.push_back(n);
                     }
                     for (int i = 2; i < verts.size(); i++) {
-                        Triangle* triangle = new Triangle(verts[0], verts[i-1], verts[i]);
+                        Triangle* triangle = new Triangle(verts[0], verts[i-1], verts[i], norms[0], norms[i-1], norms[i]);
                         triangle->setFill(fill);
                         triangles.push_back(triangle);
                     }
@@ -132,27 +135,35 @@ Renderer::Renderer(const string &fname) {
                     if (numCoords == 3) {
                         getline(istream, line);
                         stringstream ass(line);
-                        Eigen::Vector3d A;
+                        Eigen::Vector4d A;
                         ass>>A[0]>>A[1]>>A[2];
+                        A[3] = 1;
+                        A = M*A;
 
                         getline(istream, line);
                         stringstream bss(line);
-                        Eigen::Vector3d B;
+                        Eigen::Vector4d B;
                         bss>>B[0]>>B[1]>>B[2];
+                        B[3] = 1;
+                        B = M*B;
 
                         getline(istream, line);
                         stringstream css(line);
-                        Eigen::Vector3d C;
+                        Eigen::Vector4d C;
                         css>>C[0]>>C[1]>>C[2];
+                        C[3] = 1;
+                        C = M * C;
                         triangles.push_back(new Triangle(A,B,C));
                         triangles.back()->setFill(fill);
                     } else if (numCoords > 3) {
-                        vector<Eigen::Vector3d> verts;
+                        vector<Eigen::Vector4d> verts;
                         for (int i = 0; i < numCoords; i++) {
                             getline(istream, line);
                             stringstream ss(line);
-                            Eigen::Vector3d v;
+                            Eigen::Vector4d v;
                             ss>>v[0]>>v[1]>>v[2];
+                            v[3] = 1;
+                            v = M * v;
                             verts.push_back(v);
                         }
                         for (int i = 2; i < verts.size(); i++) {
@@ -216,6 +227,10 @@ void Renderer::details(){
     cout << "M_cam: \n" << M_cam << endl;
     cout << "M_per: \n" << M_per << endl;
     cout << "M: \n" << M << endl;
+
+    for (int i = 0; i < 30; i++) {
+        triangles[i]->details();
+    }
     
 } 
 
@@ -224,9 +239,9 @@ void Triangle::details() {
     cout << "Type: Triangle" << endl;
     cout << "Color: " << endl;
     cout << "R: " << fill.color[0] << "\tB: " << fill.color[1] << "\tG: " << fill.color[2] << endl << endl;
-    //cout << a[0] << "\t" << a[1] << "\t" << a[2] << endl;
-    //cout << b[0] << "\t" << b[1] << "\t" << b[2] << endl;
-    //cout << c[0] << "\t" << c[1] << "\t" << c[2] << endl;
+    cout << a[0] << "\t" << a[1] << "\t" << a[2] << "\t" << a[3] << endl;
+    cout << b[0] << "\t" << b[1] << "\t" << b[2] << "\t" << b[3] << endl;
+    cout << c[0] << "\t" << c[1] << "\t" << c[2] << "\t" << c[3] << endl;
 }
 
 // A simple function to check if the file name extension is valid

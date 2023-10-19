@@ -3,5 +3,6 @@
 *.d
 *.ppm
 *.png
+*.exe
 hide
 shade
