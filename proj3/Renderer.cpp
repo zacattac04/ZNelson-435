@@ -65,7 +65,9 @@ Renderer::Renderer(const string &fname) {
                 getline(istream,line);
                 stringstream resss(line);
                 resss>>junk>>res[0]>>res[1];
-
+                //vector<Fragment> fArray[(int)res[0] * (int)res[1]];
+                //fragments = fArray;
+                fragments = new vector<Fragment>[(int)res[0] * (int)res[1]];
                 M_vp << res[0] / 2, 0, 0, (res[0]-1)/2,
                         0, res[1] / 2, 0, (res[1]-1)/2,
                         0, 0, 1, 0,
@@ -233,6 +235,7 @@ void Renderer::vertexProcessing(bool shading) {
     }
 }
 
+
 Eigen::Vector3d Renderer::shade(Eigen::Vector3d p, Eigen::Vector3d n, Fill f) {
     double lightIntensity = 1.0/sqrt(lights.size());
     Eigen::Vector3d localColor(0,0,0);
@@ -257,6 +260,52 @@ Eigen::Vector3d Renderer::shade(Eigen::Vector3d p, Eigen::Vector3d n, Fill f) {
     return totalColor;
 }
 
+void Renderer::rasterizer(const Triangle &t) {
+    Eigen::Vector4d p[3] = {t.p[0], t.p[1], t.p[2]};
+    p[0] /= p[0][3];
+    p[1] /= p[1][3];
+    p[2] /= p[2][3];
+    
+    double dminx=10000, dminy=10000, dmaxx = -10000, dmaxy = -10000;
+
+    for (int i = 0; i < 3; i++) {
+        dminx = min(dminx, p[i][0]);
+        dminy = min(dminy, p[i][1]);
+        dmaxx = max(dmaxx, p[i][0]);
+        dmaxy = max(dmaxy, p[i][1]);
+    }
+
+    int minx = (int)floor(dminx);
+    int miny = (int)floor(dminy);
+    int maxx = (int)ceil(dmaxx);
+    int maxy = (int)ceil(dmaxy);
+    minx = clamp<int>(minx, 0, res[0]-1);
+    miny = clamp<int>(miny, 0, res[1]-1);
+    maxx = clamp<int>(maxx, 0, res[0]-1);
+    maxy = clamp<int>(maxy, 0, res[1]-1);
+
+    double falpha = line(p[1][0], p[1][1], p[2][0], p[2][1], p[0][0], p[0][1]);
+    double fbeta = line(p[2][0], p[2][1], p[0][0], p[0][1], p[1][0], p[1][1]);
+    double fgamma = line(p[0][0], p[0][1], p[1][0], p[1][1], p[2][0], p[2][1]);
+
+    for (int i = miny; i <= maxy; i++) {
+        for (int j = minx; j <= maxx; j++) {
+            double alpha = line(p[1][0], p[1][1], p[2][0], p[2][1], (double) j, (double) i) / falpha;
+            double beta = line(p[2][0], p[2][1], p[0][0], p[0][1], (double) j, (double) i) / falpha;
+            double gamma = line(p[0][0], p[0][1], p[1][0], p[1][1], (double) j, (double) i) / falpha;
+            if (alpha >= 0 && beta >= 0 && gamma >= 0) {
+                if ((alpha > 0 || falpha*line(p[1][0],p[1][1], p[2][0], p[2][1], -1.0, -1.0) > 0) &&
+                    (beta  > 0 ||  fbeta*line(p[2][0],p[2][1], p[0][0], p[0][1], -1.0, -1.0) > 0) &&
+                    (gamma > 0 || fgamma*line(p[0][0],p[0][1], p[1][0], p[1][1], -1.0, -1.0) > 0)) {
+                        Fragment f;
+                        f.z = alpha*p[0][2] + beta*p[1][2] + gamma*p[2][2];
+                        f.color = alpha*t.color[0] + beta*t.color[1] + gamma*t.color[2];
+                        fragments[i*res[0] + j].push_back(f);
+                    }
+            }
+        }
+    }
+}
 // A class that prints all of the details read from the nff file
 // Isn't utilized in the current code, was just to check if the file was being read properly
 void Renderer::details(){

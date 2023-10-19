@@ -53,6 +53,7 @@ public:
     ~Renderer();
     void vertexProcessing(bool shading);
     Eigen::Vector3d shade(Eigen::Vector3d p, Eigen::Vector3d n, Fill f);
+    void rasterizer(const Triangle &t);
     void details();
     bool checkExtension(const string fname, string extension);
 
@@ -70,7 +71,7 @@ private:
     Eigen::Matrix4d M_per;
     Eigen::Matrix4d M_cam;
     Eigen::Matrix4d M;
-    vector<Fragment>* fragments;
+    vector<Fragment> *fragments;
 };
 
 #endif
