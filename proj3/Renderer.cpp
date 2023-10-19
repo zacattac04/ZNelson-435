@@ -9,6 +9,10 @@ double det(const Eigen::Vector3d &a, const Eigen::Vector3d &b, const Eigen::Vect
             c[0] * (a[1] * b[2] - b[1] * a[2]);
 }
 
+inline double line(double x0, double y0, double x1, double y1, double x, double y) {
+    return (y0-y1) * x + (x1-x0) * y + x0*y1 - x1*y0;
+}
+
 // Reads all of the data from the nff file
 // All surfaces (Polygons, Polygon patches, spheres) are placed in the surfaces vector
 // Light objects are placed in the light vector
@@ -71,6 +75,7 @@ Renderer::Renderer(const string &fname) {
                 Eigen::Vector3d u = up.cross(w);
                 u.normalize();
                 Eigen::Vector3d v = w.cross(u);
+                /*
                 M_cam << u[0], u[1], u[2], 0,
                          v[0], v[1], v[2], 0,
                          w[0], w[1], w[2], 0,
@@ -80,8 +85,12 @@ Renderer::Renderer(const string &fname) {
                          0, 1, 0, -1 * eye[1],
                          0, 0, 1, -1 * eye[2],
                          0, 0, 0, 1;
-                M_cam = M_cam * M_inv;
-
+                M_cam = M_cam * M_inv;*/
+                M_cam << u[0], v[0], w[0], eye[0],
+                         u[1], v[1], w[1], eye[1],
+                         u[2], v[2], w[2], eye[2],
+                         0, 0, 0, 1;
+                M_cam = M_cam.inverse().eval();
                 double d = (eye - at).norm();
                 double h = tan((M_PI/180.0) * (angle/2.0)) * d;
                 double increment = (2*h) / res[0];
@@ -89,10 +98,11 @@ Renderer::Renderer(const string &fname) {
                 double t = h*(((double)res[1])/res[0]) - 0.5*increment;
                 double r = h - 0.5*increment;
                 double b = -h*(((double)res[1])/res[0]) + 0.5*increment;
-                double f = 10;
-                M_per << (2 * hither) / (r-l), 0, (l+r) / (r-l), 0,
-                         0, (2 * hither) / (t-b), (b+t) / (b-t), 0,
-                         0, 0, (f + hither) / (hither - f), (2 * f * hither) / (f - hither),
+                double f = 100;
+                double n = -hither;
+                M_per << (2 * n) / (r-l), 0, (l+r) / (r-l), 0,
+                         0, (2 * n) / (t-b), (b+t) / (b-t), 0,
+                         0, 0, (f + n) / (n - f), (2 * f * n) / (f - n),
                          0, 0, 1, 0;
                 M = M_vp * M_per * M_cam;
                 break;
@@ -109,17 +119,14 @@ Renderer::Renderer(const string &fname) {
                     int numCoords;
                     string junk;
                     ss>>junk>>numCoords;
-                    vector<Eigen::Vector4d> verts;
-                    vector<Eigen::Vector4d> norms;
+                    vector<Eigen::Vector3d> verts;
+                    vector<Eigen::Vector3d> norms;
                     for (int i = 0; i < numCoords; i++) {
                         getline(istream, line);
                         stringstream ss(line);
-                        Eigen::Vector4d v;
-                        Eigen::Vector4d n;
+                        Eigen::Vector3d v;
+                        Eigen::Vector3d n;
                         ss>>v[0]>>v[1]>>v[2]>>n[0]>>n[1]>>n[2];
-                        v[3] = 1;
-                        n[3] = 1;
-                        v = M * v;
                         verts.push_back(v);
                         norms.push_back(n);
                     }
@@ -135,35 +142,27 @@ Renderer::Renderer(const string &fname) {
                     if (numCoords == 3) {
                         getline(istream, line);
                         stringstream ass(line);
-                        Eigen::Vector4d A;
+                        Eigen::Vector3d A;
                         ass>>A[0]>>A[1]>>A[2];
-                        A[3] = 1;
-                        A = M*A;
 
                         getline(istream, line);
                         stringstream bss(line);
-                        Eigen::Vector4d B;
+                        Eigen::Vector3d B;
                         bss>>B[0]>>B[1]>>B[2];
-                        B[3] = 1;
-                        B = M*B;
 
                         getline(istream, line);
                         stringstream css(line);
-                        Eigen::Vector4d C;
+                        Eigen::Vector3d C;
                         css>>C[0]>>C[1]>>C[2];
-                        C[3] = 1;
-                        C = M * C;
                         triangles.push_back(new Triangle(A,B,C));
                         triangles.back()->setFill(fill);
                     } else if (numCoords > 3) {
-                        vector<Eigen::Vector4d> verts;
+                        vector<Eigen::Vector3d> verts;
                         for (int i = 0; i < numCoords; i++) {
                             getline(istream, line);
                             stringstream ss(line);
-                            Eigen::Vector4d v;
+                            Eigen::Vector3d v;
                             ss>>v[0]>>v[1]>>v[2];
-                            v[3] = 1;
-                            v = M * v;
                             verts.push_back(v);
                         }
                         for (int i = 2; i < verts.size(); i++) {
@@ -197,6 +196,65 @@ Renderer::~Renderer(){
     for (int i = 0; i<triangles.size(); i++) {
         delete triangles[i];
     }
+}
+
+void Renderer::vertexProcessing(bool shading) {
+    for (int i = 0; i < triangles.size(); i++) {
+        Triangle* t = triangles[i];
+        if (shading) {
+            for (int j = 0; j < 3; j++) {
+                Eigen::Vector3d p;
+                Eigen::Vector3d n;
+                if (j == 0) {
+                    p = t->a;
+                    n = t->na;
+                } else if (j == 1) {
+                    p = t->b;
+                    n = t->nb;
+                } else {
+                    p = t->c;
+                    n = t->nc;
+                }
+                t->color[j] = shade(p, n, t->getFill());
+
+
+            }
+        } else {
+            t->color[0] = t->getFill().color;
+            t->color[1] = t->getFill().color;
+            t->color[2] = t->getFill().color;
+        }
+        Eigen::Vector4d v(t->a[0], t->a[1], t->a[2], 1);
+        t->p[0] = M * v;
+        v << t->b[0], t->b[1], t->b[2], 1;
+        t->p[1] = M * v;
+        v << t->c[0], t->c[1], t->c[2], 1;
+        t->p[2] = M * v;
+    }
+}
+
+Eigen::Vector3d Renderer::shade(Eigen::Vector3d p, Eigen::Vector3d n, Fill f) {
+    double lightIntensity = 1.0/sqrt(lights.size());
+    Eigen::Vector3d localColor(0,0,0);
+    for (int i = 0; i < lights.size(); i++) {
+        Eigen::Vector3d L = lights[i].p - p;
+        L.normalize();
+        Eigen::Vector3d v = eye - p;
+        Eigen::Vector3d H = L + v;
+        H.normalize();
+        double diffuse = max(0.0, n.dot(L));
+        double specular = pow(max(0.0, n.dot(H)), f.e);
+        localColor[0] += (f.kd *f.color[0]*diffuse + f.ks*specular) * lightIntensity;
+        localColor[1] += (f.kd *f.color[1]*diffuse + f.ks*specular) * lightIntensity;
+        localColor[2] += (f.kd *f.color[2]*diffuse + f.ks*specular) * lightIntensity;
+    }
+    Eigen::Vector3d totalColor(localColor);
+    // It is possible for the RGB values to exceed 1
+    // Therefore we must clamp the values to prevent overflow 
+    totalColor[0] = clamp(totalColor[0], 0.0, 1.0);
+    totalColor[1] = clamp(totalColor[1], 0.0, 1.0);
+    totalColor[2] = clamp(totalColor[2], 0.0, 1.0);
+    return totalColor;
 }
 
 // A class that prints all of the details read from the nff file
@@ -239,15 +297,15 @@ void Triangle::details() {
     cout << "Type: Triangle" << endl;
     cout << "Color: " << endl;
     cout << "R: " << fill.color[0] << "\tB: " << fill.color[1] << "\tG: " << fill.color[2] << endl << endl;
-    cout << a[0] << "\t" << a[1] << "\t" << a[2] << "\t" << a[3] << endl;
-    cout << b[0] << "\t" << b[1] << "\t" << b[2] << "\t" << b[3] << endl;
-    cout << c[0] << "\t" << c[1] << "\t" << c[2] << "\t" << c[3] << endl;
+    cout << a[0] << "\t" << a[1] << "\t" << a[2] <<  endl;
+    cout << b[0] << "\t" << b[1] << "\t" << b[2] <<  endl;
+    cout << c[0] << "\t" << c[1] << "\t" << c[2] <<  endl;
 }
 
 // A simple function to check if the file name extension is valid
 // Returns true if the extension is correct, false otherwise
 bool Renderer::checkExtension(const string fname, string extension) {
-    int index = fname.find('.');
+    int index = fname.find_last_of('.');
     if (index == -1)
         return false;
     if (fname.substr(index).compare(extension) != 0) {
