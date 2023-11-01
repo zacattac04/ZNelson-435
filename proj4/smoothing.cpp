@@ -112,7 +112,46 @@ bool readObjFile(const char *fname, std::vector<Eigen::Vector3d> &pts, std::vect
   return true;
 }
 
-void writeObjFile(char *fname, const std::vector<Eigen::Vector3d> &meshPts, const std::vector<Tri> &triangles) {
+void smoother(std::vector<Eigen::Vector3d> &pts, std::vector<Tri> &triangles, double stepsize, int n) {
+    Eigen::Vector3d zero(0,0,0);
+    for (int j = 0; j < n; j++) {
+        int m[pts.size()];
+        std::vector<Eigen::Vector3d> lap;
+        for (int i = 0; i < pts.size(); i++) {
+            lap.push_back(zero);
+            m[i] = 0;
+        }
+        for (int i = 0; i < triangles.size(); i++) {
+
+            Tri triangle = triangles[i];
+            int aIndex = triangle[0];
+            int bIndex = triangle[1];
+            int cIndex = triangle[2];
+            Eigen::Vector3d a = pts[aIndex];
+            Eigen::Vector3d b = pts[bIndex];
+            Eigen::Vector3d c = pts[cIndex];
+
+            lap[aIndex] += b-a;
+            lap[aIndex] += c-a;
+            m[aIndex] += 2;
+
+            lap[bIndex] += a-b;
+            lap[bIndex] += c-b;
+            m[bIndex] += 2;
+
+            lap[cIndex] += a-c;
+            lap[cIndex] += b-c;
+            m[cIndex] += 2;
+
+        }
+
+        for (int i = 0; i < pts.size(); i++) {
+            pts[i] += stepsize * (lap[i] / m[i]);
+        }
+    }
+}
+
+void writeObjFile(const char *fname, const std::vector<Eigen::Vector3d> &meshPts, const std::vector<Tri> &triangles) {
   std::ofstream out;
   std::vector<Eigen::Vector3d>::const_iterator p;
   std::vector<Tri>::const_iterator t;
@@ -131,6 +170,10 @@ void writeObjFile(char *fname, const std::vector<Eigen::Vector3d> &meshPts, cons
 int main(int argc, const char * argv[]) {
     std::vector<Eigen::Vector3d> pts;
     std::vector<Tri> triangles;
+    std::cout << "Reading file" << std::endl;
     readObjFile(argv[1], pts, triangles);
+    std::cout << "Done." << std::endl << "Smoothing..." << std::endl;
+    smoother(pts, triangles, atof(argv[3]), atoi(argv[4]));
+    writeObjFile(argv[2], pts, triangles);
     return 0;
 }

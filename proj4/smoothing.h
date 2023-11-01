@@ -25,4 +25,6 @@ bool readObjFile(char *fname, std::vector<Eigen::Vector3d> &pts, std::vector<Tri
 
 void writeObjFile(char *fname, const std::vector<Eigen::Vector3d> &meshPts, const std::vector<Tri> &triangles);
 
+void smoother(std::vector<Eigen::Vector3d> &pts, std::vector<Tri> &triangles, double stepsize, int n);
+
 #endif
