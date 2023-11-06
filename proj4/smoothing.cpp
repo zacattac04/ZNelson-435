@@ -112,6 +112,8 @@ bool readObjFile(const char *fname, std::vector<Eigen::Vector3d> &pts, std::vect
   return true;
 }
 
+// Takes in the pts vector, triangles vector, stepsize, and n (iteration count)
+// It directly modifies the pts vector, and therefore is irreversible
 void smoother(std::vector<Eigen::Vector3d> &pts, std::vector<Tri> &triangles, double stepsize, int n) {
     Eigen::Vector3d zero(0,0,0);
     for (int j = 0; j < n; j++) {
