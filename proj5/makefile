@@ -16,7 +16,7 @@ OBJECTS = kdTree.o
 #-----------------------------------------
 
 LIBS = 
-INCS = -I/usr/local/include/eigen3 -I/usr/include/eigen3
+INCS = -I C:\Users\zacha\Documents\eigen-3.4.0\
 
 CCOPTS = $(OPT) $(INCS) 
 LDOPTS = $(OPT) $(INCS) $(LIBS) 
@@ -33,17 +33,19 @@ clean:
 #-----------------------------------------
 #-----------------------------------------
 
+
+.cpp.o: 
+	$(CC) $(CCOPTS) -c $< 
+
+#-----------------------------------------
+#-----------------------------------------
+
+
 viewer: $(OBJECTS) viewer.o
 	$(CC) $(OBJECTS) viewer.o $(LDOPTS) $(GL_LIB) -o viewer
 
 fishtank: $(OBJECTS) fishtank.o
 	$(CC) $(OBJECTS) fishtank.o $(LDOPTS) -o fishtank
-
-#-----------------------------------------
-#-----------------------------------------
-
-.cpp.o: 
-	$(CC) $(CCOPTS) -c $< 
 
 #-----------------------------------------
 #-----------------------------------------
