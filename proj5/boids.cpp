@@ -53,21 +53,16 @@ Boids::Boids(const string &fname) {
     istream.close();
 }
 
+// This function will move the boids based on the constraints
+// and write the positions and velocity to the file
+// It is currently set up to only deal with boids, and not food objects
 void Boids::draw(const char * & fname) {
     FILE * f = fopen(fname, "wb");
     int steps = (int)ceil(length / dt);
-    int v1strong = 0;
-    int v2strong = 0;
-    int v3strong = 0;
-    int v1small = 0;
-    double v1avg = 0;
-    double v2avg = 0;
-    double v3avg = 0;
-    //int steps = (int)length;
     fprintf(f, "%d\n", steps);
     cout << "Drawing animation: Steps out of " << steps << endl;
     for (int i = 0; i < steps; i++) {
-        if (i % 25 == 0) {
+        if (i % 50 == 0) {
             cout << i << endl;
         }
         fprintf(f, "%lld\n", pts.size());
@@ -85,27 +80,8 @@ void Boids::draw(const char * & fname) {
             Eigen::Vector3d v2 = avoidCrowding(neighbors, j);
             Eigen::Vector3d v3 = matchVelocity(neighbors, j);
             Eigen::Vector3d v4 = stayInBounds(j);
-            if (v1.norm() > v2.norm() && v1.norm() > v3.norm()) {
-                v1strong++;
-            } else if (v2.norm() > v1.norm() && v2.norm() > v3.norm()) {
-                v2strong++;
-            } else {
-                v3strong++;
-            }
-            if (v1.norm() < 1) {
-                v1small++;
-            }
-            v1avg += v1.norm();
-            v2avg += v2.norm();
-            v3avg += v3.norm();
             newPtsV[j] = (ptsV[j] + v1 + v2 + v3 + v4) * damping;
             newPts[j] = pts[j] + (newPtsV[j] * dt * 2);
-            /*
-            if (outOfBounds(newPts[j])) {
-                newPtsV[j] = (-ptsV[j] + v1 + v2 + v3);
-                newPts[j] = pts[j] + (newPtsV[j] * dt * damping);
-            }
-            */
             if (isnan(newPts[j][0])) {
                 cout << "Something messed up!" << endl;
                 cout << "pts[" << j << "]: " << pts[j][0] << " " << pts[j][1] << " " << pts[j][2] << endl;
@@ -122,35 +98,15 @@ void Boids::draw(const char * & fname) {
         
         
     }
-
-    v1avg /= 30000;
-    v2avg /= 30000;
-    v3avg /= 30000;
-    cout << "Done!" << endl;
-    cout << "Times v1 was strongest: " << v1strong << endl;
-    cout << "Times v2 was strongest: " << v2strong << endl;
-    cout << "Times v3 was strongest: " << v3strong << endl;
-    cout << "Times v1 was less than 1: " << v1small << endl;
-    cout << "Average strength of v1: " << v1avg << endl;
-    cout << "Average strength of v2: " << v2avg << endl;
-    cout << "Average strength of v3: " << v3avg << endl;
     fclose(f);
 }
 
-bool Boids::outOfBounds(Eigen::Vector3d pt) {
-    if (pt[0] < -0.5 || pt[0] > 0.5)
-        return true;
-    else if (pt[1] < -0.25 || pt[1] > 0.25)
-        return true;
-    else if (pt[2] < -0.125 || pt[2] > 0.125)
-        return true;
-    return false;
-}
-
+// This creates a velocity vector
+// That moves the boid to the average heading of the neighboring boids
 Eigen::Vector3d Boids::moveTowardsCenter(vector<int> neighbors, unsigned int n) {
     Eigen::Vector3d center(0.0,0.0,0.0);
     for (unsigned int i = 0; i < neighbors.size(); i++) {
-        if (neighbors[i] != n)
+        if ((unsigned int)neighbors[i] != n)
             center += pts[neighbors[i]];
     }
     if (neighbors.size() > 1) {
@@ -160,59 +116,72 @@ Eigen::Vector3d Boids::moveTowardsCenter(vector<int> neighbors, unsigned int n) 
     return (center - pts[n]) * centering;
 }
 
+// This creates a velocity vector
+// that moves the boid away from other boids that are too close
 Eigen::Vector3d Boids::avoidCrowding(vector<int> neighbors, unsigned int n) {
     Eigen::Vector3d c(0.0,0.0,0.0);
     Eigen::Vector3d pos = pts[n];
     for (unsigned int i = 0; i < neighbors.size(); i++) {
-        if (neighbors[i] != n) {
+        if ((unsigned int)neighbors[i] != n) {
             Eigen::Vector3d pos2 = pts[neighbors[i]];
             double nm = (pos - pos2).norm();
-            //if (nm < collision) {
-                //c -= (pos - pos2);
-            //}
-            //c -= (pos - pos2) * (collision / pow(nm, 2));
-            c -= (pos2 - pos) * (collision / (pow(nm, 2) * 10));
-            //c -= (pos2 - pos) * (collision);
+            c -= (pos2 - pos) * (collision / (pow(nm, 2) * 10)); // I reduced the force by 10, as I found this vector to overpower the others
         }
     }
     return c;
 }
 
+// This creates a velocity vector
+// That matches the heading/velocity of the boid with neighboring boids
 Eigen::Vector3d Boids::matchVelocity(vector<int> neighbors, unsigned int n) {
     Eigen::Vector3d v(0.0,0.0,0.0);
     for (unsigned int i = 0; i < neighbors.size(); i++) {
-        if (neighbors[i] != n) {
+        if ((unsigned int)neighbors[i] != n) {
             v += ptsV[neighbors[i]];
         }
     }
     if (neighbors.size() > 1) {
         v /= (neighbors.size() - 1);
     }
-    //return (ptsV[n] - v) * velocity;
     return (v - ptsV[n]) * velocity;
 }
 
+// This creates a velocity vector
+// That pushes the boid away from the bounds of the scene
+// This does not create a rigid "box".
+// It produces a force proportional to the distance out of bounds the boid is.
+// When using the Godot viewer, some of the boids will temporarily disappear.
+// I felt it best to keep as is, as it made a more natural simulation than rigidly bouncing off the box
 Eigen::Vector3d Boids::stayInBounds(unsigned int n) {
     Eigen::Vector3d pos = pts[n];
     Eigen::Vector3d v(0.0,0.0,0.0);
-    double force = 0.1;
     if (pos[0] < -0.5) {
-        v[0] = force;
+        //v[0] = force;
+        v[0] = pow(pos[0] + 0.5, 2);
     } else if (pos[0] > 0.5) {
-        v[0] = -force;
+        //v[0] = -force;
+        v[0] = -1 * pow(pos[0] - 0.5, 2);
     }
     if (pos[1] < - 0.25) {
-        v[1] = force;
+        //v[1] = force;
+        v[1] = pow(pos[1] + 0.25, 2);
     } else if (pos[1] > 0.25) {
-        v[1] = -force;
+        //v[1] = -force;
+        v[1] = -1 * pow(pos[1] - 0.25, 2);
     }
     if (pos[2] < -0.125) {
-        v[2] = force;
+        //v[2] = force;
+        v[2] = pow(pos[2] + 0.125, 2);
     } else if (pos[2] > 0.125) {
-        v[2] = -force;
+        //v[2] = -force;
+        v[2] = -1 * pow(pos[2] - 0.125, 2);
     }
     return v;
 }
+
+// This prints basic details as read from the sample.in file
+// This code will not activate from the code as is
+// I leave it here for posteriety, but it is not important
 void Boids::details() {
     cout << "Size: " << size << endl;
     cout << "Neighbor Radius: " << neighbor_radius << endl;
@@ -226,12 +195,11 @@ void Boids::details() {
     cout << "Dt: " << dt << endl;
     cout << "Length: " << length << endl;
     
-    //KDTree tree(pts);
+    KDTree tree(pts);
     cout << "nboids: " << nboids << endl;
     for (int i = 0; i < 10; i++) {
         Eigen::Vector3d pos = pts[i];
         Eigen::Vector3d v = ptsV[i];
-        KDTree tree(pts);
         vector<int> neighbors;
         tree.neighbors(pts, pos, 0, neighbor_radius, neighbors);
         cout << "[" << pos[0] << "," << pos[1] << "," << pos[2] << "] ";
@@ -244,6 +212,7 @@ int main(int argc, const char * argv[]) {
     if (argc < 2) {
         throw runtime_error("No input file given");
     }
+    
     Boids boids(argv[1]);
     boids.draw(argv[2]);
     //boids.details();

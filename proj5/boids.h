@@ -19,7 +19,6 @@ public:
     Eigen::Vector3d avoidCrowding(vector<int> neighbors, unsigned int n);
     Eigen::Vector3d matchVelocity(vector<int> neighbors, unsigned int n);
     Eigen::Vector3d stayInBounds(unsigned int n);
-    bool outOfBounds(Eigen::Vector3d pt);
     void draw(const char * & fname);
 private:
     double size;
