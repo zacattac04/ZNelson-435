@@ -56,6 +56,13 @@ Boids::Boids(const string &fname) {
 void Boids::draw(const char * & fname) {
     FILE * f = fopen(fname, "wb");
     int steps = (int)ceil(length / dt);
+    int v1strong = 0;
+    int v2strong = 0;
+    int v3strong = 0;
+    int v1small = 0;
+    double v1avg = 0;
+    double v2avg = 0;
+    double v3avg = 0;
     //int steps = (int)length;
     fprintf(f, "%d\n", steps);
     cout << "Drawing animation: Steps out of " << steps << endl;
@@ -77,12 +84,28 @@ void Boids::draw(const char * & fname) {
             Eigen::Vector3d v1 = moveTowardsCenter(neighbors, j);
             Eigen::Vector3d v2 = avoidCrowding(neighbors, j);
             Eigen::Vector3d v3 = matchVelocity(neighbors, j);
-            newPtsV[j] = (ptsV[j] + v1 + v2 + v3) * damping;
-            newPts[j] = pts[j] + (newPtsV[j] * dt);
-            if (outOfBounds(newPts[j])) {
-                newPtsV[j] = (-ptsV[j] + v1 + v2 + v3) * damping;
-                newPts[j] = pts[j] + (newPtsV[j] * dt);
+            Eigen::Vector3d v4 = stayInBounds(j);
+            if (v1.norm() > v2.norm() && v1.norm() > v3.norm()) {
+                v1strong++;
+            } else if (v2.norm() > v1.norm() && v2.norm() > v3.norm()) {
+                v2strong++;
+            } else {
+                v3strong++;
             }
+            if (v1.norm() < 1) {
+                v1small++;
+            }
+            v1avg += v1.norm();
+            v2avg += v2.norm();
+            v3avg += v3.norm();
+            newPtsV[j] = (ptsV[j] + v1 + v2 + v3 + v4) * damping;
+            newPts[j] = pts[j] + (newPtsV[j] * dt * 2);
+            /*
+            if (outOfBounds(newPts[j])) {
+                newPtsV[j] = (-ptsV[j] + v1 + v2 + v3);
+                newPts[j] = pts[j] + (newPtsV[j] * dt * damping);
+            }
+            */
             if (isnan(newPts[j][0])) {
                 cout << "Something messed up!" << endl;
                 cout << "pts[" << j << "]: " << pts[j][0] << " " << pts[j][1] << " " << pts[j][2] << endl;
@@ -99,7 +122,18 @@ void Boids::draw(const char * & fname) {
         
         
     }
+
+    v1avg /= 30000;
+    v2avg /= 30000;
+    v3avg /= 30000;
     cout << "Done!" << endl;
+    cout << "Times v1 was strongest: " << v1strong << endl;
+    cout << "Times v2 was strongest: " << v2strong << endl;
+    cout << "Times v3 was strongest: " << v3strong << endl;
+    cout << "Times v1 was less than 1: " << v1small << endl;
+    cout << "Average strength of v1: " << v1avg << endl;
+    cout << "Average strength of v2: " << v2avg << endl;
+    cout << "Average strength of v3: " << v3avg << endl;
     fclose(f);
 }
 
@@ -112,6 +146,7 @@ bool Boids::outOfBounds(Eigen::Vector3d pt) {
         return true;
     return false;
 }
+
 Eigen::Vector3d Boids::moveTowardsCenter(vector<int> neighbors, unsigned int n) {
     Eigen::Vector3d center(0.0,0.0,0.0);
     for (unsigned int i = 0; i < neighbors.size(); i++) {
@@ -136,7 +171,8 @@ Eigen::Vector3d Boids::avoidCrowding(vector<int> neighbors, unsigned int n) {
                 //c -= (pos - pos2);
             //}
             //c -= (pos - pos2) * (collision / pow(nm, 2));
-            c -= (pos2 - pos) * (collision / pow(nm, 2));
+            c -= (pos2 - pos) * (collision / (pow(nm, 2) * 10));
+            //c -= (pos2 - pos) * (collision);
         }
     }
     return c;
@@ -156,6 +192,27 @@ Eigen::Vector3d Boids::matchVelocity(vector<int> neighbors, unsigned int n) {
     return (v - ptsV[n]) * velocity;
 }
 
+Eigen::Vector3d Boids::stayInBounds(unsigned int n) {
+    Eigen::Vector3d pos = pts[n];
+    Eigen::Vector3d v(0.0,0.0,0.0);
+    double force = 0.1;
+    if (pos[0] < -0.5) {
+        v[0] = force;
+    } else if (pos[0] > 0.5) {
+        v[0] = -force;
+    }
+    if (pos[1] < - 0.25) {
+        v[1] = force;
+    } else if (pos[1] > 0.25) {
+        v[1] = -force;
+    }
+    if (pos[2] < -0.125) {
+        v[2] = force;
+    } else if (pos[2] > 0.125) {
+        v[2] = -force;
+    }
+    return v;
+}
 void Boids::details() {
     cout << "Size: " << size << endl;
     cout << "Neighbor Radius: " << neighbor_radius << endl;
