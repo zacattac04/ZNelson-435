@@ -4,12 +4,15 @@
 #include <Eigen/Dense>
 #include <iostream>
 #include <cmath>
+
 using namespace cimg_library;
 using namespace Eigen;
 using namespace std;
 
 
 /*
+// This is a simple 2-d convolution function
+// It was originally meant for using the sobel operators, which I didn't end up doing
 double convolve(MatrixXd image, MatrixXd filter, int x, int y) {
     int cols = image.cols();
     int rows = image.rows();
@@ -37,6 +40,9 @@ double convolve(MatrixXd image, MatrixXd filter, int x, int y) {
 }
 */
 /*
+// This was my attempt at using the sobel operators to find the energy map
+// While it seemingly worked, it took several minutes to calculate the energy once
+// This would have taken too long for practical use
 MatrixXd computeSobelMap(MatrixXd greyscale) {
     int height = greyscale.rows();
     int width = greyscale.cols();
@@ -92,59 +98,9 @@ MatrixXd computeSobelMap(MatrixXd greyscale) {
 }
 */
 
-
-
-vector<int> findSeam(MatrixXd energyMap) {
-    int rows = energyMap.rows();
-    int cols = energyMap.cols();
-
-    MatrixXd cost(rows, cols);
-    cost.row(0) = energyMap.row(0);
-
-    for (int i = 1; i < rows; i++) {
-        for (int j = 0; j < cols; j++) {
-            if (j == 0) {
-                cost(i, j) = energyMap(i, j) + min(cost(i-1, j), cost(i-1, j+1));
-            } else if (j == cols - 1) {
-                cost(i, j) = energyMap(i, j) + min(cost(i-1, j-1), cost(i-1, j));
-            } else {
-                cost(i, j) = energyMap(i, j) + min({cost(i-1, j-1), cost(i-1,j), cost(i-1, j+1)});
-            }
-        }
-    }
-
-    int minIndex = 0;
-    for (int j = 1; j < cols; j++) {
-        if (cost(rows-1, j) < cost(rows-1, minIndex)) {
-            minIndex = j;
-        }
-    }
-
-    vector<int> seam(rows);
-    seam[rows-1] = minIndex;
-    for(int i = rows - 2; i >= 0; i--) {
-        if (minIndex == 0) {
-            minIndex = cost(i, minIndex) < cost(i, minIndex + 1) ? minIndex : minIndex + 1;
-        } else if (minIndex == cols - 1) {
-            minIndex = cost(i, minIndex - 1) < cost(i, minIndex) ? minIndex - 1 : minIndex;
-        } else {
-            int minNeighbor = minIndex - 1;
-            for (int j = minIndex - 1; j <= minIndex + 1; j++) {
-                if (cost(i, j) < cost(i, minNeighbor)) {
-                    minNeighbor = j;
-                }
-            }
-            minIndex = minNeighbor;
-        }
-
-        seam[i] = minIndex;
-    }
-
-    return seam;
-}
-
-
-
+// This creates an energy map using the simple energy function in the paper
+// That being, the energy of the image is the absolute value of the partial derivative of x, plus the absolute value of the partial derivative of y.
+// It uses the central difference in most cases, and forward difference and backward difference on the edges
 MatrixXd computeSimpleMap(MatrixXd image) {
     int height = image.rows();
     int width = image.cols();
@@ -198,6 +154,13 @@ MatrixXd computeSimpleMap(MatrixXd image) {
     return energyMap;
 }
 
+// This returns a "greyscale" image by taking the average of all three channels
+// In practice, this isn't a true greyscale, as we are using LAB, not RGB
+// A true greyscale would simple have been to pass only the first channel (luminance)
+// However, this would mean that two pixels with the same luminance but different colors would be equal
+// I felt that it was best in practice to take the average, as this takes into account all of the data
+// I also didn't account for the fact that the channels are bounded differently (L from [0,100], A and B from [-128, 128])
+// It seems to work fine though, so I'm leaving it as is
 MatrixXd greyscaleImage(Vector3d image[], int height, int width) {
     MatrixXd greyscale(height, width);
     for (int i = 0; i < width; i++) {
@@ -213,12 +176,67 @@ MatrixXd greyscaleImage(Vector3d image[], int height, int width) {
     return greyscale;
 }
 
+// Given an energy map, this will find the optimal vertical seam
+// It returns a vector of indices representing which pixel in each column to not include
+vector<int> findSeam(MatrixXd energyMap) {
+    int rows = energyMap.rows();
+    int cols = energyMap.cols();
+
+    MatrixXd cost(rows, cols);
+    cost.row(0) = energyMap.row(0);
+
+    for (int i = 1; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            if (j == 0) {
+                cost(i, j) = energyMap(i, j) + min(cost(i-1, j), cost(i-1, j+1));
+            } else if (j == cols - 1) {
+                cost(i, j) = energyMap(i, j) + min(cost(i-1, j-1), cost(i-1, j));
+            } else {
+                cost(i, j) = energyMap(i, j) + min({cost(i-1, j-1), cost(i-1,j), cost(i-1, j+1)});
+            }
+        }
+    }
+
+    int minIndex = 0;
+    for (int j = 1; j < cols; j++) {
+        if (cost(rows-1, j) < cost(rows-1, minIndex)) {
+            minIndex = j;
+        }
+    }
+
+    vector<int> seam(rows);
+    seam[rows-1] = minIndex;
+    for(int i = rows - 2; i >= 0; i--) {
+        if (minIndex == 0) {
+            minIndex = cost(i, minIndex) < cost(i, minIndex + 1) ? minIndex : minIndex + 1;
+        } else if (minIndex == cols - 1) {
+            minIndex = cost(i, minIndex - 1) < cost(i, minIndex) ? minIndex - 1 : minIndex;
+        } else {
+            int minNeighbor = minIndex - 1;
+            for (int j = minIndex - 1; j <= minIndex + 1; j++) {
+                if (cost(i, j) < cost(i, minNeighbor)) {
+                    minNeighbor = j;
+                }
+            }
+            minIndex = minNeighbor;
+        }
+
+        seam[i] = minIndex;
+    }
+
+    return seam;
+}
+
+// This is an alternative way to call findSeam
+// It is given the image vector, height, and width
 vector<int> findSeam(Vector3d *image, int height, int width) {
     MatrixXd greyscale = greyscaleImage(image, height, width);
     MatrixXd energyMap = computeSimpleMap(greyscale);
     return findSeam(energyMap);
 }
 
+// This finds the max energy in the energyMap
+// This is for the purpose of printing the energy image
 double maxEnergy(MatrixXd energyMap) {
     int height = energyMap.rows();
     int width = energyMap.cols();
@@ -233,7 +251,7 @@ double maxEnergy(MatrixXd energyMap) {
     return max;
 }
 
-
+// This is a simple function that transposes the image vector
 Vector3d *transpose(Vector3d *image, int height, int width) {
     Vector3d *transposedImage = new Vector3d[height*width];
 
@@ -245,6 +263,12 @@ Vector3d *transpose(Vector3d *image, int height, int width) {
     return transposedImage;
 }
 
+// This is the function that resizes the image
+// It always resizes the width first, and then the height
+// Since the findSeam function only finds vertical seams, we transpose the image before resizing the height
+// Effectively, we are just resizing the width of a transposed image
+// Afterwards, we transpose the image again to return it to the original orientation
+// At the end we return the resized image
 Vector3d *resize(Vector3d *image, int height, int width, int newHeight, int newWidth) {
     while (newWidth < width) {
         MatrixXd greyscale = greyscaleImage(image, height, width);
@@ -314,7 +338,6 @@ int main(int argc, char *argv[]) {
     double maxE = maxEnergy(energyMap);
     cout << "Done." << endl;
     vector<int> seam = findSeam(energyMap);
-    //cout << "seam Size: " << seam.size() << endl;
     for (int i=0; i<input.width(); i++) {
         for (int j=0; j<input.height(); j++) {
             energy(i, j, 0) = pow(energyMap(j, i)/maxE, 1.0/3.0) * 100;
@@ -334,28 +357,26 @@ int main(int argc, char *argv[]) {
     }
 
     int newHeight, newWidth;
-    //std::cout << "Num Args: " << argc << std::endl;
     if (argc <= 3) {
         newHeight = input.height();
         newWidth = input.width();
     } else {
         newWidth = atoi(argv[3]);
         newHeight = atoi(argv[4]);
+        if (newWidth > input.width()) {
+            cout << "Error: Width given is greater than image width. Reverting to image width." << endl;
+            newWidth = input.width();
+        }
+        if (newHeight > input.height()) {
+            cout << "Error: Height given is greater than image Height. Reverting to image Height." << endl;
+            newHeight = input.height();
+        }
     }
-
-    
 
     cout << "Resizing...";
     image = resize(image, input.height(), input.width(), newHeight, newWidth);
-    //image = findSeam(image, input.height(), input.width());
     cout << "Done." << endl;
-    //image = transpose(image, newHeight, newWidth);
-    //int temp = newHeight;
-    //newHeight = newWidth;
-    //newWidth = temp;
     CImg<double> output(newWidth, newHeight, input.depth(), input.spectrum(), 0);
-    //Vector3d *transposedImage = transpose(image, input.height(), input.width());
-    //vector<int> seamH = findSeam(transposedImage, input.width(), input.height());
 
     for (int i=0; i<output.height();i++) {
         for (int j = 0; j < output.width(); j++) {

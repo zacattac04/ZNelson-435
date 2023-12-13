@@ -1,11 +1,9 @@
 CXX = g++
-CXXFLAGS = -I C:\Users\zacha\Documents\eigen-3.4.0\ -Wall -o3
+CXXFLAGS = -Wall -o3 -I/usr/include/eigen3 
 
 seamCarve:
 	$(CXX) $(CXXFLAGS) seamCarve.cpp -o seamCarve
 
-matrixTest:
-	$(CXX) -I C:\Users\zacha\Documents\eigen-3.4.0\ matrixTest.cpp -o matrixTest
 
 clean:
 	rm *.o
