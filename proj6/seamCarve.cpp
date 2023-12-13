@@ -92,6 +92,8 @@ MatrixXd computeSobelMap(MatrixXd greyscale) {
 }
 */
 
+
+
 vector<int> findSeam(MatrixXd energyMap) {
     int rows = energyMap.rows();
     int cols = energyMap.cols();
@@ -211,6 +213,12 @@ MatrixXd greyscaleImage(Vector3d image[], int height, int width) {
     return greyscale;
 }
 
+vector<int> findSeam(Vector3d *image, int height, int width) {
+    MatrixXd greyscale = greyscaleImage(image, height, width);
+    MatrixXd energyMap = computeSimpleMap(greyscale);
+    return findSeam(energyMap);
+}
+
 double maxEnergy(MatrixXd energyMap) {
     int height = energyMap.rows();
     int width = energyMap.cols();
@@ -225,6 +233,17 @@ double maxEnergy(MatrixXd energyMap) {
     return max;
 }
 
+
+Vector3d *transpose(Vector3d *image, int height, int width) {
+    Vector3d *transposedImage = new Vector3d[height*width];
+
+    for(int i = 0; i < width; i++) {
+        for (int j = 0; j < height; j++) {
+            transposedImage[j*width+i] = image[i*height+j];
+        }
+    }
+    return transposedImage;
+}
 
 Vector3d *resize(Vector3d *image, int height, int width, int newHeight, int newWidth) {
     while (newWidth < width) {
@@ -244,19 +263,34 @@ Vector3d *resize(Vector3d *image, int height, int width, int newHeight, int newW
         image = newImage;
     }
 
-    return image;
-}
-/*
-Vector3d *showSeam(Vector3d *image, int height, int width) {
-    MatrixXd greyscale =greyscaleImage(image, height, width);
-    MatrixXd energyMap = computeSimpleMap(greyscale);
-    vector<int>seam = findSeam(energyMap);
-    for(int i = 0; i < height; i++) {
-        image[i*width+seam[i]][0] = 0;
+    image = transpose(image, height, width);
+    int temp = height;
+    height = width;
+    width = temp;
+    temp = newHeight;
+    newHeight = newWidth;
+    newWidth = temp;
+    while (newWidth < width) {
+        MatrixXd greyscale = greyscaleImage(image, height, width);
+        MatrixXd energyMap = computeSimpleMap(greyscale);
+        vector<int> seam = findSeam(energyMap);
+        width--;
+        Vector3d *newImage = new Vector3d[width*height];
+        for (int i = 0; i < height; i++) {
+            for(int j = 0; j < seam[i]; j++) {
+                newImage[j*height+i] = image[j*height+i];
+            }
+            for (int j = seam[i]; j < width; j++) {
+                newImage[j*height+i] = image[(j+1)*height+i];
+            }
+        }
+        image = newImage;
     }
+    image = transpose(image, height, width);
+
     return image;
 }
-*/
+
 int main(int argc, char *argv[]) {
     CImg<double> input(argv[1]);
     CImg<double> lab = input.RGBtoLab();
@@ -288,6 +322,16 @@ int main(int argc, char *argv[]) {
             energy(i, j, 2) = 0;
         }
     }
+    Vector3d *transposedImage = transpose(image, input.height(), input.width());
+    vector<int> seamH = findSeam(transposedImage, input.width(), input.height());
+    for(int i = 0; i < input.height(); i++) {
+        energy(seam[i], i, 0) = 100;
+        energy(seam[i], i, 1) = 128;
+    }
+    for(int i = 0; i < input.width(); i++) {
+        energy(i, seamH[i], 0) = 100;
+        energy(i, seamH[i], 2) = 128;
+    }
 
     int newHeight, newWidth;
     //std::cout << "Num Args: " << argc << std::endl;
@@ -298,35 +342,27 @@ int main(int argc, char *argv[]) {
         newWidth = atoi(argv[3]);
         newHeight = atoi(argv[4]);
     }
+
+    
+
     cout << "Resizing...";
     image = resize(image, input.height(), input.width(), newHeight, newWidth);
     //image = findSeam(image, input.height(), input.width());
     cout << "Done." << endl;
+    //image = transpose(image, newHeight, newWidth);
+    //int temp = newHeight;
+    //newHeight = newWidth;
+    //newWidth = temp;
     CImg<double> output(newWidth, newHeight, input.depth(), input.spectrum(), 0);
-    /*
-    for (int i=0; i<output.width(); i++) {
-        for (int j=0; j<output.height(); j++) {
-            output(i, j, 0) = image[i*output.height()+j][0];
-            output(i, j, 1) = image[i*output.height()+j][1];
-            output(i, j, 2) = image[i*output.height()+j][2];
-        }
-    }
-    */
+    //Vector3d *transposedImage = transpose(image, input.height(), input.width());
+    //vector<int> seamH = findSeam(transposedImage, input.width(), input.height());
+
     for (int i=0; i<output.height();i++) {
         for (int j = 0; j < output.width(); j++) {
             output(j, i, 0) = image[j*output.height()+i][0];
             output(j, i, 1) = image[j*output.height()+i][1];
             output(j, i, 2) = image[j*output.height()+i][2];
         }
-    }
-    for(int i = 0; i < input.height(); i++) {
-        //image[seam[i]*input.width()+i][0] = 100;
-        //image[seam[i]*input.width()+i][1] = 128;
-        //output(seam[i], i, 0) = 100;
-        //output(seam[i], i, 1) = 128;
-        energy(seam[i], i, 0) = 100;
-        energy(seam[i], i, 1) = 128;
-        //energy(i, seam[i], 2) = 128;
     }
 
     CImg<double> energyOut = energy.LabtoRGB();
