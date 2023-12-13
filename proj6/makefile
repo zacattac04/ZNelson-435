@@ -1,5 +1,5 @@
 CXX = g++
-CXXFLAGS = -I C:\Users\zacha\Documents\eigen-3.4.0\ -I C:\CImg-3.3.3 -Wall -o3
+CXXFLAGS = -I C:\Users\zacha\Documents\eigen-3.4.0\ -Wall -o3
 
 seamCarve:
 	$(CXX) $(CXXFLAGS) seamCarve.cpp -o seamCarve

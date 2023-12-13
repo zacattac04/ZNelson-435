@@ -8,6 +8,8 @@ using namespace cimg_library;
 using namespace Eigen;
 using namespace std;
 
+
+/*
 double convolve(MatrixXd image, MatrixXd filter, int x, int y) {
     int cols = image.cols();
     int rows = image.rows();
@@ -33,7 +35,7 @@ double convolve(MatrixXd image, MatrixXd filter, int x, int y) {
     }
     return sum;
 }
-
+*/
 /*
 MatrixXd computeSobelMap(MatrixXd greyscale) {
     int height = greyscale.rows();
@@ -90,16 +92,67 @@ MatrixXd computeSobelMap(MatrixXd greyscale) {
 }
 */
 
+vector<int> findSeam(MatrixXd energyMap) {
+    int rows = energyMap.rows();
+    int cols = energyMap.cols();
+
+    MatrixXd cost(rows, cols);
+    cost.row(0) = energyMap.row(0);
+
+    for (int i = 1; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            if (j == 0) {
+                cost(i, j) = energyMap(i, j) + min(cost(i-1, j), cost(i-1, j+1));
+            } else if (j == cols - 1) {
+                cost(i, j) = energyMap(i, j) + min(cost(i-1, j-1), cost(i-1, j));
+            } else {
+                cost(i, j) = energyMap(i, j) + min({cost(i-1, j-1), cost(i-1,j), cost(i-1, j+1)});
+            }
+        }
+    }
+
+    int minIndex = 0;
+    for (int j = 1; j < cols; j++) {
+        if (cost(rows-1, j) < cost(rows-1, minIndex)) {
+            minIndex = j;
+        }
+    }
+
+    vector<int> seam(rows);
+    seam[rows-1] = minIndex;
+    for(int i = rows - 2; i >= 0; i--) {
+        if (minIndex == 0) {
+            minIndex = cost(i, minIndex) < cost(i, minIndex + 1) ? minIndex : minIndex + 1;
+        } else if (minIndex == cols - 1) {
+            minIndex = cost(i, minIndex - 1) < cost(i, minIndex) ? minIndex - 1 : minIndex;
+        } else {
+            int minNeighbor = minIndex - 1;
+            for (int j = minIndex - 1; j <= minIndex + 1; j++) {
+                if (cost(i, j) < cost(i, minNeighbor)) {
+                    minNeighbor = j;
+                }
+            }
+            minIndex = minNeighbor;
+        }
+
+        seam[i] = minIndex;
+    }
+
+    return seam;
+}
+
+
+
 MatrixXd computeSimpleMap(MatrixXd image) {
     int height = image.rows();
     int width = image.cols();
     MatrixXd edgesX(height, width);
     MatrixXd edgesY(height, width);
-    cout << "Convolving..." << endl;
+    //cout << "Convolving..." << endl;
     for (int i = 0; i < (height / 10); i++) {
-        cout << "-";
+        //cout << "-";
     }
-    cout << endl;
+    //cout << endl;
     for (int i = 0; i < height; i++) {
         for (int j = 0; j < width; j++) {
             if (i > 0 && i < (height-1)) {
@@ -133,7 +186,7 @@ MatrixXd computeSimpleMap(MatrixXd image) {
             }
         }
         if (i % 10 == 0) {
-            cout << "*";
+            //cout << "*";
         }
     }
 
@@ -173,6 +226,37 @@ double maxEnergy(MatrixXd energyMap) {
 }
 
 
+Vector3d *resize(Vector3d *image, int height, int width, int newHeight, int newWidth) {
+    while (newWidth < width) {
+        MatrixXd greyscale = greyscaleImage(image, height, width);
+        MatrixXd energyMap = computeSimpleMap(greyscale);
+        vector<int> seam = findSeam(energyMap);
+        width--;
+        Vector3d *newImage = new Vector3d[width*height];
+        for (int i = 0; i < height; i++) {
+            for(int j = 0; j < seam[i]; j++) {
+                newImage[j*height+i] = image[j*height+i];
+            }
+            for (int j = seam[i]; j < width; j++) {
+                newImage[j*height+i] = image[(j+1)*height+i];
+            }
+        }
+        image = newImage;
+    }
+
+    return image;
+}
+/*
+Vector3d *showSeam(Vector3d *image, int height, int width) {
+    MatrixXd greyscale =greyscaleImage(image, height, width);
+    MatrixXd energyMap = computeSimpleMap(greyscale);
+    vector<int>seam = findSeam(energyMap);
+    for(int i = 0; i < height; i++) {
+        image[i*width+seam[i]][0] = 0;
+    }
+    return image;
+}
+*/
 int main(int argc, char *argv[]) {
     CImg<double> input(argv[1]);
     CImg<double> lab = input.RGBtoLab();
@@ -184,6 +268,27 @@ int main(int argc, char *argv[]) {
             image[i*input.height()+j][2] = lab(i, j, 2);
         }
     }
+
+    MatrixXd greyscale = greyscaleImage(image, input.height(), input.width());
+    cout << "greyscale rows: " << greyscale.rows() << endl;
+    cout << "greyscale cols: " << greyscale.cols() << endl;
+    MatrixXd energyMap = computeSimpleMap(greyscale);
+    cout << "Creating energy image...";
+    CImg<double> energy(input.width(), input.height(), input.depth(), input.spectrum(), 0);
+    cout << "Done." << endl;
+    cout << "Finding max value...";
+    double maxE = maxEnergy(energyMap);
+    cout << "Done." << endl;
+    vector<int> seam = findSeam(energyMap);
+    //cout << "seam Size: " << seam.size() << endl;
+    for (int i=0; i<input.width(); i++) {
+        for (int j=0; j<input.height(); j++) {
+            energy(i, j, 0) = pow(energyMap(j, i)/maxE, 1.0/3.0) * 100;
+            energy(i, j, 1) = 0;
+            energy(i, j, 2) = 0;
+        }
+    }
+
     int newHeight, newWidth;
     //std::cout << "Num Args: " << argc << std::endl;
     if (argc <= 3) {
@@ -193,7 +298,12 @@ int main(int argc, char *argv[]) {
         newWidth = atoi(argv[3]);
         newHeight = atoi(argv[4]);
     }
+    cout << "Resizing...";
+    image = resize(image, input.height(), input.width(), newHeight, newWidth);
+    //image = findSeam(image, input.height(), input.width());
+    cout << "Done." << endl;
     CImg<double> output(newWidth, newHeight, input.depth(), input.spectrum(), 0);
+    /*
     for (int i=0; i<output.width(); i++) {
         for (int j=0; j<output.height(); j++) {
             output(i, j, 0) = image[i*output.height()+j][0];
@@ -201,30 +311,24 @@ int main(int argc, char *argv[]) {
             output(i, j, 2) = image[i*output.height()+j][2];
         }
     }
-    MatrixXd greyscale = greyscaleImage(image, input.height(), input.width());
-    cout << "greyscale rows: " << greyscale.rows() << endl;
-    cout << "greyscale cols: " << greyscale.cols() << endl;
-    MatrixXd energyMap = computeSimpleMap(greyscale);
-    CImg<double> grey(input.width(), input.height(), input.depth(), input.spectrum(), 0);
-    cout << "Creating energy image..." << endl;
-    CImg<double> energy(input.width(), input.height(), input.depth(), input.spectrum(), 0);
-    cout << "Done." << endl;
-    cout << "Finding max value..." << endl;
-    double maxE = maxEnergy(energyMap);
-    cout << "Done." << endl;
-    for (int i=0; i<input.width(); i++) {
-        for (int j=0; j<input.height(); j++) {
-            grey(i, j, 0) = lab(i, j, 0);
-            grey(i, j, 1) = 0;
-            grey(i, j, 2) = 0;
-            energy(i, j, 0) = pow(energyMap(j, i)/maxE, 1.0/3.0) * 100;
-            energy(i, j, 1) = 0;
-            energy(i, j, 2) = 0;
+    */
+    for (int i=0; i<output.height();i++) {
+        for (int j = 0; j < output.width(); j++) {
+            output(j, i, 0) = image[j*output.height()+i][0];
+            output(j, i, 1) = image[j*output.height()+i][1];
+            output(j, i, 2) = image[j*output.height()+i][2];
         }
     }
+    for(int i = 0; i < input.height(); i++) {
+        //image[seam[i]*input.width()+i][0] = 100;
+        //image[seam[i]*input.width()+i][1] = 128;
+        //output(seam[i], i, 0) = 100;
+        //output(seam[i], i, 1) = 128;
+        energy(seam[i], i, 0) = 100;
+        energy(seam[i], i, 1) = 128;
+        //energy(i, seam[i], 2) = 128;
+    }
 
-    //CImg<double> greyOut = grey.LabtoRGB();
-    //greyOut.save_jpeg("greyscale.jpg");
     CImg<double> energyOut = energy.LabtoRGB();
     energyOut.save_jpeg("energy.jpg");
     CImg<double> rgb = output.LabtoRGB();
